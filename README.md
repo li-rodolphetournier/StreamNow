@@ -1,63 +1,168 @@
-# STREAMNOW — Next.js VOD (Demo)
+# 🎬 StreamNow — Plateforme VOD (Next.js + TypeScript + Tailwind)
 
-STREAMNOW est une plateforme VOD de démonstration conçue pour explorer des sujets clés du streaming à grande échelle : player adaptatif, optimisation des catalogues, accessibilité, SSR/SSG/ISR et architecture microservices pour la scalabilité.
+StreamNow est une application VOD moderne inspirée de Netflix / TF1+, développée avec Next.js 15, TypeScript, TailwindCSS et Shadcn UI. L'application utilise l'API TMDB pour les données vidéo.
 
-## ✨ Caractéristiques
-- **Next.js 14 (app router) + TypeScript** — SSG/ISR pour le catalogue, SSR pour les vues personnalisées, Edge Functions si pertinent.
-- **Tailwind CSS** — Design system via utilitaires, tokens centralisés, a11y-first.
-- **Architecture microservices** — Services découplés (catalogue, média, user, analytics, temps réel), API Gateway, SDKs typés.
-- **Performance & fiabilité** — CDN, Redis, queues (jobs asynchrones), observabilité (OpenTelemetry), bonnes pratiques Web Vitals.
+## 🎯 Contexte du projet
 
-## 🧱 Architecture (vue d’ensemble)
-- **Next.js (BFF léger)** via SDKs typés (OpenAPI/tRPC) — pas d’accès direct aux DB.
-- **API Gateway/Reverse proxy** (auth, rate limiting, agrégation).
-- **Services**:
-  - `catalog-service`: Postgres + (optionnel) Elastic pour la recherche.
-  - `media-service`: stockage objet (S3/GCS), CDN, manifests HLS/DASH, DRM proxy.
-  - `user-service`: Postgres, auth OIDC/JWT.
-  - `analytics-service`: ingestion Kafka/PubSub → ClickHouse/BigQuery.
-  - `realtime-gateway`: WS/SSE, adapter Redis/NATS, stateless.
-- **Asynchrone & résilience**: Kafka/NATS, queues (SQS/RabbitMQ), retry + DLQ.
-- **Caches**: Redis, CDN (assets & segments), ISR avec invalidations par tags.
-- **Observabilité**: OpenTelemetry (traces/métriques/logs), Prometheus/Grafana, logs centralisés.
-- **Sécurité**: JWT/OIDC, scopes par service, secrets via vault, URLs signées pour médias.
+Application frontend monolithique Next.js 15 avec TypeScript, TailwindCSS, Shadcn UI, et une API externe (TMDB) pour les données vidéo.
 
-## 🚀 Démarrage (dev)
-Prérequis: Node.js LTS, npm.
+## ⚙️ Stack technique
+
+### Frontend
+- **Next.js 15** (App Router)
+- **TypeScript** (strict mode)
+- **TailwindCSS**
+- **Shadcn UI**
+- **React Query** (@tanstack/react-query)
+- **Zustand**
+- **Axios**
+- **Framer Motion**
+- **Lucide React**
+- **React Player**
+
+### Outils de développement
+- **ESLint** / **Prettier**
+- **Jest** (tests unitaires)
+- **Playwright** (tests E2E, optionnel)
+
+### Environnement
+- **Node.js 18+**
+- **npm** ou **pnpm**
+- **Déploiement sur Vercel**
+
+## 🧱 Structure du projet
+
+```
+src/
+├── app/
+│   ├── (main)/
+│   │   ├── page.tsx              # Page d'accueil
+│   │   ├── search/
+│   │   │   └── page.tsx           # Page recherche
+│   │   └── video/
+│   │       └── [id]/
+│   │           └── page.tsx       # Page détail vidéo
+│   ├── layout.tsx                 # Layout principal
+│   ├── globals.css                # Styles globaux
+│   └── api/
+│       └── videos/
+│           └── route.ts           # API route pour vidéos
+├── components/
+│   ├── ui/                        # Composants Shadcn UI
+│   ├── video/                     # Composants vidéo
+│   │   ├── VideoCard.tsx
+│   │   ├── VideoGrid.tsx
+│   │   ├── VideoPlayer.tsx
+│   │   └── VideoCarousel.tsx
+│   ├── search/                    # Composants recherche
+│   │   ├── SearchBar.tsx
+│   │   └── CategoryFilter.tsx
+│   ├── layout/                    # Composants layout
+│   │   ├── Header.tsx
+│   │   └── Footer.tsx
+│   └── shared/                    # Composants partagés
+│       └── HeroSection.tsx
+├── lib/
+│   ├── api/
+│   │   └── tmdb.ts               # Client API TMDB
+│   ├── store/
+│   │   └── useVideoStore.ts      # Store Zustand
+│   └── utils.ts                  # Utilitaires
+├── hooks/
+│   ├── useVideos.ts              # Hook pour récupérer vidéos
+│   ├── useSearch.ts              # Hook pour recherche
+│   └── useWatchHistory.ts        # Hook pour historique
+├── types/
+│   ├── video.ts                  # Types vidéo
+│   └── api.ts                    # Types API
+└── public/                       # Assets statiques
+```
+
+## 🚀 Démarrage
+
+### Prérequis
+- Node.js 18+
+- npm ou pnpm
+
+### Installation
 
 ```bash
+# Installer les dépendances
 npm install
+
+# Lancer le serveur de développement
 npm run dev
 ```
 
-## 🔧 Configuration
-- **Alias imports**: `@/*`
-- **Règles d’équipe**: voir `.cursorrules` (noms explicites, strict typing, a11y, SSG/ISR de préférence, tests ciblés, performance mesurée).
-- **Env (exemples à venir)**: `NEXT_PUBLIC_*` pour variables côté client, secrets via runtime sécurisé.
+Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
 
-## 📈 Performance
-- **SSG/ISR** pour les pages catalogue publiques, cache CDN activé.
-- **SSR** lorsque la personnalisation est requise (watchlist, recommandations).
-- **Lazy-load** pour modules lourds (player, graphiques), optimisation d’images Next.
-- **Web Vitals** collectés par `analytics-service`.
+### Commandes disponibles
 
-## 🧪 Tests (cible)
-- Unit tests pour utilitaires et composants critiques (player UI, parsing manifests).
-- E2E minimal sur flux critiques (lecture, recherche, auth si ajoutée).
+```bash
+# Développement
+npm run dev
 
-## 🗺️ Roadmap (extraits)
-- [ ] Monorepo Turborepo (`services/*`, `packages/sdk-*`, `shared-config`).
-- [ ] `catalog-service` + `sdk-catalog` (OpenAPI/tRPC) et intégration Next.js.
-- [ ] Intégration player HLS/DASH (HLS.js/Shaka) avec ABR et métriques.
-- [ ] `media-service` (URLs signées, intégration CDN, encodage via workers).
-- [ ] `analytics-service` (ingestion events player, QoE, tableaux de bord).
-- [ ] `realtime-gateway` (notifications live, présence, room scale).
-- [ ] Observabilité OTel end-to-end, SLOs, alerting.
+# Build production
+npm run build
+
+# Démarrer en production
+npm start
+
+# Linter
+npm run lint
+
+# Installer un composant Shadcn
+npx shadcn-ui add button card input dialog carousel
+```
+
+## 🧩 Fonctionnalités principales
+
+### Pages
+- **Page d'accueil** → Liste des vidéos (grille + carrousels)
+- **Page détail vidéo** → Player, description, suggestions
+- **Page recherche** → Barre de recherche + résultats filtrés
+
+### Composants clés
+- `VideoCard`, `VideoGrid`, `VideoPlayer`, `VideoCarousel`
+- `SearchBar`, `CategoryFilter`, `HeroSection`
+- `Header`, `Footer`
+- Composants UI Shadcn (Button, Card, Dialog, etc.)
+
+### Gestion de l'état
+- **React Query** pour interroger TMDB (cache, statut de chargement)
+- **Zustand** pour l'état global (favoris, historique de visionnage)
+- Persistance locale (localStorage) pour favoris / historique
+
+## 📈 Performance et accessibilité
+
+- **SSR/ISR** pour la performance
+- **next/image** pour l'optimisation des images
+- **WCAG 2.1** pour l'accessibilité
+- **Lighthouse ≥ 95** sur perf / accessibilité / SEO
+- **Dark mode** supporté
+- **Responsive design** (mobile-first)
+
+## 🧪 Tests
+
+- Tests unitaires Jest pour les hooks
+- Tests E2E Playwright (optionnel)
+- CI/CD GitHub Actions + déploiement sur Vercel
+
+## 📝 Conventions de code
+
+- **TypeScript strict** : typage complet, éviter `any`
+- **Composants fonctionnels** : function components uniquement
+- **Nommage** : camelCase pour variables/fonctions, PascalCase pour composants
+- **Tailwind + Shadcn UI** : utiliser les composants UI de Shadcn
+- **Accessibilité** : HTML sémantique, états de focus, ARIA où nécessaire
+- Voir `.cursorrules` pour plus de détails
 
 ## 🤝 Contribuer
-- Commits atomiques en style impératif (ex: `feat: …`, `fix: …`, `chore: …`).
-- Respecter `.cursorrules` et les conventions TypeScript/React/Tailwind.
-- PRs: décrire portée, décisions, trade-offs et mesures de perf.
+
+- Commits atomiques en style impératif (`feat: …`, `fix: …`, `chore: …`)
+- Respecter les conventions TypeScript/React/Tailwind
+- PRs : décrire portée, décisions, trade-offs
 
 ## 📄 Licence
+
 MIT — voir `LICENSE`.

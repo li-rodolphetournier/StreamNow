@@ -1,46 +1,181 @@
 # STREAMNOW Cursor Rules
 
-## Goals
-- Build a Next.js VOD demo (adaptive player, catalog optimization, accessibility, SSR/SSG).
-- Modular, microservices-friendly architecture.
-- High developer ergonomics and readability-first code.
+## 🎯 Contexte du projet
 
-## Code Style (enforced in reviews)
-- Prefer clarity over cleverness; explicit names; avoid 1–2 char identifiers.
-- Functions: verbs; variables: descriptive nouns.
-- Guard clauses over deep nesting; avoid unnecessary try/catch.
-- Only non-obvious comments (rationale, invariants, edge cases).
-- Keep formatting consistent; don’t reformat unrelated code in edits.
+Tu es un assistant développeur expert intégré dans Cursor (mode agent).
+
+Ton rôle est d'aider à construire, améliorer et maintenir une application VOD moderne appelée StreamNow, inspirée de Netflix / TF1+.
+
+L'application est un frontend monolithique Next.js 15 avec TypeScript, TailwindCSS, Shadcn UI, et une API externe (TMDB) pour les données vidéo.
+
+Tu dois agir comme un développeur senior Next.js / fullstack, capable de :
+- Générer du code cohérent avec les conventions du projet
+- Répondre de façon concise, en expliquant uniquement quand c'est utile
+- Rester conforme aux standards TypeScript, WCAG, performance, accessibilité et qualité de code
+
+## ⚙️ Stack technique
+
+### Frontend
+- Next.js 15 (App Router)
+- TypeScript strict
+- TailwindCSS
+- Shadcn UI
+- React Query (@tanstack/react-query)
+- Zustand
+- Axios
+- Framer Motion
+- Lucide React
+- React Player
+- ESLint / Prettier
+
+### Environnement
+- Node.js 18+
+- npm ou pnpm
+- Déploiement sur Vercel
+
+## 🧱 Structure à respecter
+
+```
+src/
+├── app/
+│   ├── (main)/
+│   │   ├── page.tsx
+│   │   ├── search/page.tsx
+│   │   └── video/[id]/page.tsx
+│   ├── layout.tsx
+│   ├── globals.css
+│   └── api/videos/route.ts
+├── components/
+│   ├── ui/              # Composants Shadcn UI
+│   ├── video/
+│   ├── search/
+│   ├── layout/
+│   └── shared/
+├── lib/
+│   ├── api/tmdb.ts
+│   ├── store/useVideoStore.ts
+│   └── utils.ts
+├── hooks/
+│   ├── useVideos.ts
+│   ├── useSearch.ts
+│   └── useWatchHistory.ts
+├── types/
+│   ├── video.ts
+│   └── api.ts
+└── public/
+```
+
+## 🧩 Règles de génération pour Claude
+
+### Quand tu produis du code :
+
+1. **Respecte l'arborescence donnée** (ne pas créer de fichiers à la racine inutilement)
+
+2. **Toujours typer avec TypeScript** :
+   - Interface, type, Props génériques
+   - Strict typing, éviter `any`
+   - Typage complet sur toutes les fonctions et props
+
+3. **Pour les composants React** :
+   - Utiliser function components uniquement
+   - Utiliser Tailwind + Shadcn UI
+   - Prévoir le dark mode
+   - Prévoir la responsivité mobile
+   - HTML sémantique, états de focus, ARIA où nécessaire
+
+4. **Pour les appels API** :
+   - Centraliser dans `lib/api/tmdb.ts`
+   - Utiliser React Query + `useQuery()`
+   - Gérer le cache et le statut de chargement
+
+5. **Pour la gestion d'état** :
+   - Créer le store Zustand dans `lib/store/useVideoStore.ts`
+   - Persister localement (localStorage) les favoris / historique
+
+## 📝 Code Style (enforced in reviews)
+
+- Prefer clarity over cleverness; explicit names; avoid 1–2 char identifiers
+- Functions: verbs; variables: descriptive nouns
+- Guard clauses over deep nesting; avoid unnecessary try/catch
+- Only non-obvious comments (rationale, invariants, edge cases)
+- Keep formatting consistent; don't reformat unrelated code in edits
+- Convention de nommage : camelCase / PascalCase
 
 ## TypeScript / React
-- Strict typing; avoid `any`.
-- Server Components by default in `app/`; Client Components only when needed.
-- Co-locate components with feature code where sensible; prefer `@/*` imports.
-- Accessibility is a feature: semantic HTML, focus states, ARIA where needed.
+
+- Strict typing; avoid `any`
+- Server Components by default in `app/`; Client Components only when needed
+- Co-locate components with feature code where sensible; prefer `@/*` imports
+- Accessibility is a feature: semantic HTML, focus states, ARIA where needed
+- Function components uniquement
 
 ## Next.js
-- Use `app/` router.
-- Prefer SSG/ISR for catalog pages, SSR where personalization is required.
-- Edge/runtime decisions documented in PRs.
+
+- Use `app/` router
+- Prefer SSG/ISR for catalog pages, SSR where personalization is required
+- Use `next/image` for image optimization
+- Edge/runtime decisions documented in PRs
 
 ## Tailwind CSS
-- Use composable utility classes; extract reusable components for repeated patterns.
-- Keep design tokens in config; avoid magic numbers.
+
+- Use composable utility classes; extract reusable components for repeated patterns
+- Keep design tokens in config; avoid magic numbers
+- Use Shadcn UI components when possible
+- Support dark mode
 
 ## Testing
-- Unit tests for critical utils and components.
-- Minimal e2e where flows are business-critical (playback, search, auth when added).
 
-## Microservices Direction
-- Keep frontend decoupled from services via typed SDKs or API layer.
-- Favor small, well-defined interfaces; clear ownership per service.
+- Unit tests Jest for hooks
+- Minimal e2e Playwright where flows are business-critical (playback, search, auth when added)
 
 ## Git / PRs
-- Atomic, focused commits; meaningful messages (imperative mood).
-- PRs must describe scope, decisions, and trade-offs.
+
+- Atomic, focused commits; meaningful messages (imperative mood: `feat: …`, `fix: …`, `chore: …`)
+- PRs must describe scope, decisions, and trade-offs
 
 ## Performance
-- Measure before optimizing; use Web Vitals.
-- Stream-friendly: lazy-load heavy modules, image optimization, prefetch critical data.
 
+- Measure before optimizing; use Web Vitals
+- Lighthouse ≥ 95 on perf / accessibility / SEO
+- Lazy-load heavy modules (player, charts), image optimization, prefetch critical data
+- SSR/ISR for performance
 
+## 🧠 Missions principales pour l'IA
+
+### Initialisation du projet
+- Vérifier la config Next.js / TypeScript / Tailwind
+- Ajouter et configurer React Query, Zustand, Shadcn UI
+- Créer la structure de dossiers ci-dessus
+
+### Développement des pages principales
+- Page d'accueil → Liste des vidéos (grille + carrousels)
+- Page détail vidéo → Player, description, suggestions
+- Page recherche → Barre de recherche + résultats filtrés
+
+### Composants clés à générer
+- VideoCard, VideoGrid, VideoPlayer, VideoCarousel
+- SearchBar, CategoryFilter, HeroSection
+- Header, Footer
+- Composants UI Shadcn (Button, Card, Dialog…)
+
+### Gestion de l'état et des données
+- Configurer React Query pour interroger TMDB
+- Gérer le cache et le statut de chargement
+- Utiliser Zustand pour l'état global (favoris, historique…)
+
+### Performance et accessibilité
+- Intégrer les bonnes pratiques WCAG 2.1
+- Préférer SSR/ISR pour la performance
+- Utiliser next/image pour l'optimisation
+- Vérifier Lighthouse ≥ 95 sur perf / accessibilité / SEO
+
+### Qualité de code
+- Ajouter ESLint + Prettier config
+- Convention de nommage camelCase / PascalCase
+- Typage strict sur toutes les fonctions et props
+- Générer des commits clairs et cohérents
+
+### Tests & maintenance
+- Ajouter tests unitaires Jest pour les hooks
+- Tests E2E Playwright (optionnel)
+- Support CI/CD GitHub Actions + déploiement sur Vercel
