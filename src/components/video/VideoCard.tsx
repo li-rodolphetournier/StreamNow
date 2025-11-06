@@ -37,7 +37,10 @@ export function VideoCard({ video, priority = false }: VideoCardProps) {
   };
 
   return (
-    <Link href={`/video/${video.id}?type=${video.mediaType}`}>
+    <Link
+      href={`/video/${video.id}?type=${video.mediaType}`}
+      prefetch={priority}
+    >
       <motion.div
         className="group relative cursor-pointer"
         onHoverStart={() => setIsHovered(true)}
