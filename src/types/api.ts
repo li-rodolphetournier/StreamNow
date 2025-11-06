@@ -94,3 +94,18 @@ export interface TMDBCrewMember {
   profile_path: string | null;
 }
 
+export interface TMDBVideo {
+  id: string;
+  key: string;
+  name: string;
+  site: string;
+  size: number;
+  type: string;
+  official: boolean;
+}
+
+export interface TMDBVideosResponse {
+  id: number;
+  results: TMDBVideo[];
+}
+

@@ -1,20 +1,25 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useVideoDetails } from "@/hooks/useVideoDetails";
 import { VideoHero } from "./VideoHero";
 import { VideoDetails } from "./VideoDetails";
 import { VideoRecommendations } from "./VideoRecommendations";
+import { VideoPlayer } from "./VideoPlayer";
 import { Skeleton } from "@/components/shared/Skeleton";
 
 interface VideoPageContentProps {
   videoId: number;
   mediaType: "movie" | "tv";
+  autoPlay?: boolean;
 }
 
 export function VideoPageContent({
   videoId,
   mediaType,
+  autoPlay = false,
 }: VideoPageContentProps) {
+  const [showPlayer, setShowPlayer] = useState(autoPlay);
   const { data: video, isLoading, error } = useVideoDetails(
     videoId,
     mediaType
@@ -41,6 +46,19 @@ export function VideoPageContent({
             Impossible de charger les détails de la vidéo.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // Si on doit afficher le player, on l'affiche en plein écran
+  if (showPlayer) {
+    return (
+      <div className="min-h-screen bg-black">
+        <VideoPlayer
+          video={video}
+          autoPlay={autoPlay}
+          onClose={() => setShowPlayer(false)}
+        />
       </div>
     );
   }

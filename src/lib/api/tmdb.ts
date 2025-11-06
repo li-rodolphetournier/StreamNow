@@ -280,3 +280,74 @@ export async function getTVShowDetails(id: number): Promise<VideoDetails> {
   return details;
 }
 
+/**
+ * Récupère les vidéos (trailers) d'un film
+ */
+export async function getMovieVideos(id: number): Promise<string | null> {
+  try {
+    const response = await apiClient.get<{
+      id: number;
+      results: Array<{
+        key: string;
+        site: string;
+        type: string;
+        official: boolean;
+      }>;
+    }>(`/movie/${id}/videos`);
+
+    // Chercher un trailer officiel YouTube
+    const trailer = response.data.results.find(
+      (v) => v.site === "YouTube" && v.type === "Trailer" && v.official
+    );
+
+    // Sinon, prendre le premier trailer YouTube
+    const youtubeTrailer = response.data.results.find(
+      (v) => v.site === "YouTube" && v.type === "Trailer"
+    );
+
+    if (trailer || youtubeTrailer) {
+      return `https://www.youtube.com/watch?v=${trailer?.key || youtubeTrailer?.key}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching movie videos:", error);
+    return null;
+  }
+}
+
+/**
+ * Récupère les vidéos (trailers) d'une série TV
+ */
+export async function getTVShowVideos(id: number): Promise<string | null> {
+  try {
+    const response = await apiClient.get<{
+      id: number;
+      results: Array<{
+        key: string;
+        site: string;
+        type: string;
+        official: boolean;
+      }>;
+    }>(`/tv/${id}/videos`);
+
+    // Chercher un trailer officiel YouTube
+    const trailer = response.data.results.find(
+      (v) => v.site === "YouTube" && v.type === "Trailer" && v.official
+    );
+
+    // Sinon, prendre le premier trailer YouTube
+    const youtubeTrailer = response.data.results.find(
+      (v) => v.site === "YouTube" && v.type === "Trailer"
+    );
+
+    if (trailer || youtubeTrailer) {
+      return `https://www.youtube.com/watch?v=${trailer?.key || youtubeTrailer?.key}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching TV show videos:", error);
+    return null;
+  }
+}
