@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  swcMinify: true,
+  // swcMinify est activé par défaut dans Next.js 16+
 };
 
 export default nextConfig;
