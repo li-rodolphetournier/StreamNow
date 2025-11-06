@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ export function SearchBar({
   autoFocus = false,
 }: SearchBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [isFocused, setIsFocused] = useState(false);
@@ -54,7 +55,7 @@ export function SearchBar({
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [query, router, onSearch, searchParams]);
+  }, [query, router, onSearch, pathname]);
 
   const handleClear = () => {
     setQuery("");
