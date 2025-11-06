@@ -5,8 +5,8 @@
 export interface TMDBResponse<T> {
   page: number;
   results: T[];
-  totalPages: number;
-  totalResults: number;
+  total_pages: number;
+  total_results: number;
 }
 
 export interface TMDBMovie {
@@ -24,6 +24,7 @@ export interface TMDBMovie {
   original_title: string;
   popularity: number;
   video: boolean;
+  media_type?: "movie";
 }
 
 export interface TMDBTVShow {
@@ -41,6 +42,7 @@ export interface TMDBTVShow {
   original_name: string;
   popularity: number;
   origin_country: string[];
+  media_type?: "tv";
 }
 
 export interface TMDBVideoDetails {

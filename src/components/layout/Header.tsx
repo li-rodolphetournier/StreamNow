@@ -1,11 +1,16 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search/SearchBar";
 import { cn } from "@/lib/utils";
+
+function SearchBarWrapper() {
+  return <SearchBar />;
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -43,7 +48,11 @@ export function Header() {
 
         {/* Search Bar */}
         <div className="flex-1 max-w-md mx-4 hidden md:block">
-          {!isSearchPage && <SearchBar />}
+          {!isSearchPage && (
+            <Suspense fallback={<div className="h-10 w-full bg-muted animate-pulse rounded" />}>
+              <SearchBarWrapper />
+            </Suspense>
+          )}
         </div>
 
         {/* Mobile Search Button */}

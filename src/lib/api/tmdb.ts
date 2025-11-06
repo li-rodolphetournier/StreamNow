@@ -153,9 +153,13 @@ export async function searchVideos(
   );
 
   const videos: Video[] = response.data.results
-    .filter((item) => item.media_type === "movie" || item.media_type === "tv")
+    .filter((item) => {
+      const itemWithType = item as TMDBMovie | TMDBTVShow;
+      return itemWithType.media_type === "movie" || itemWithType.media_type === "tv";
+    })
     .map((item) => {
-      if (item.media_type === "movie") {
+      const itemWithType = item as TMDBMovie | TMDBTVShow;
+      if (itemWithType.media_type === "movie") {
         return mapMovieToVideo(item as TMDBMovie);
       }
       return mapTVShowToVideo(item as TMDBTVShow);

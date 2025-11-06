@@ -12,6 +12,7 @@ interface SearchBarProps {
   onSearch?: (query: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  defaultValue?: string;
 }
 
 export function SearchBar({
@@ -19,11 +20,14 @@ export function SearchBar({
   onSearch,
   placeholder = "Rechercher des films, séries...",
   autoFocus = false,
+  defaultValue = "",
 }: SearchBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [query, setQuery] = useState(
+    defaultValue || searchParams.get("q") || ""
+  );
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
