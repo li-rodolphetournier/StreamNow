@@ -12,6 +12,7 @@ interface VideoStore {
   addToFavorites: (video: Video) => void;
   removeFromFavorites: (videoId: number) => void;
   isFavorite: (videoId: number) => boolean;
+  clearFavorites: () => void;
   addToWatchHistory: (video: Video, progress?: number) => void;
   getWatchProgress: (videoId: number) => number | undefined;
   removeFromWatchHistory: (videoId: number) => void;
@@ -26,11 +27,9 @@ export const useVideoStore = create<VideoStore>()(
 
       addToFavorites: (video) => {
         set((state) => {
-          if (state.favorites.some((f) => f.id === video.id)) {
-            return state;
-          }
+          const filtered = state.favorites.filter((fav) => fav.id !== video.id);
           return {
-            favorites: [...state.favorites, video],
+            favorites: [video, ...filtered],
           };
         });
       },
@@ -43,6 +42,10 @@ export const useVideoStore = create<VideoStore>()(
 
       isFavorite: (videoId) => {
         return get().favorites.some((f) => f.id === videoId);
+      },
+
+      clearFavorites: () => {
+        set({ favorites: [] });
       },
 
       addToWatchHistory: (video, progress) => {
