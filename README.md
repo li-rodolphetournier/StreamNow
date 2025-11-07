@@ -121,6 +121,18 @@ npm run lint
 npx shadcn-ui add button card input dialog carousel
 ```
 
+### Configuration des variables d'environnement
+
+- Copiez le fichier `.env.example` (si existant) ou créez `.env.local` à la racine :
+
+```env
+NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_api_key_here
+```
+
+- **Déploiement Vercel** :
+  - Ajoutez `NEXT_PUBLIC_TMDB_API_KEY` dans les Variables d'environnement (toutes les cibles nécessaires).
+  - Ajoutez également `NPM_FLAGS = --legacy-peer-deps` pour aligner l'installation npm sur la résolution locale (React 19 + Testing Library). Sans ce flag, les builds Vercel échoueront.
+
 ## 🧩 Fonctionnalités principales
 
 ### Pages

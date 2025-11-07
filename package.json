@@ -29,8 +29,8 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.2.0",
-    "@testing-library/react": "^14.1.2",
-    "@testing-library/user-event": "^14.4.3",
+    "@testing-library/react": "^15.0.0",
+    "@testing-library/user-event": "^15.0.0",
     "@types/jest": "^29.5.12",
     "@types/node": "^20",
     "@types/react": "^19",

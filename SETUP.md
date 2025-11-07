@@ -36,6 +36,17 @@ npm run dev
 
 Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
 
+## Déploiement Vercel
+
+Pour des builds cohérents avec l'environnement local (React 19 + Testing Library) :
+
+1. Dans votre dashboard Vercel → *Settings* → *Environment Variables* :
+   - `NEXT_PUBLIC_TMDB_API_KEY = your_tmdb_api_key_here`
+   - `NPM_FLAGS = --legacy-peer-deps`
+2. Relancez un déploiement (`Redeploy`) pour que la configuration soit prise en compte.
+
+Sans la variable `NPM_FLAGS`, `npm install` échouera à cause d'un conflit de peer dependency.
+
 ## Configuration Shadcn UI
 
 Pour ajouter des composants Shadcn UI :
