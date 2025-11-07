@@ -147,6 +147,7 @@ npx shadcn-ui add button card input dialog carousel
 - Lien d'évitement « Aller au contenu principal » + focus management sur `<main>`
 - Navigation clavier complète (lecteur vidéo, carrousels, filtres de recherche)
 - Annonces `aria-live` pour les états du player et des résultats de recherche
+- **Mode hors ligne (PWA)** via `next-pwa` : service worker, page `/offline`, manifest
 - **Lighthouse ≥ 95** sur perf / accessibilité / SEO
 - **Dark mode** supporté
 - **Responsive design** (mobile-first)

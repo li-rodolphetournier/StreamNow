@@ -1,0 +1,23 @@
+{
+  "name": "StreamNow",
+  "short_name": "StreamNow",
+  "description": "Plateforme VOD moderne — Next.js, TypeScript, Tailwind",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/next.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
+

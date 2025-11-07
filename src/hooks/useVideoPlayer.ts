@@ -24,16 +24,28 @@ export function useVideoPlayer({
     initialProgressRef.current = saved ?? 0;
   }
 
-  const [played, setPlayed] = useState(() => {
-    const saved = initialProgressRef.current;
-    return saved && saved > 0 ? saved / 100 : 0;
-  });
+  const [played, setPlayed] = useState(0);
   const [playedSeconds, setPlayedSeconds] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const playerRef = useRef<ReactPlayer | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialiser la barre de progression avec la valeur sauvegardée
+  useEffect(() => {
+    const saved = initialProgressRef.current;
+    if (saved && saved > 0) {
+      setPlayed(saved / 100);
+    }
+  }, []);
+
+  useEffect(() => {
+    const saved = initialProgressRef.current;
+    if (saved && saved > 0 && duration > 0) {
+      setPlayedSeconds((saved / 100) * duration);
+    }
+  }, [duration]);
 
   // Sauvegarder la progression
   const saveProgress = useCallback(() => {
@@ -71,8 +83,12 @@ export function useVideoPlayer({
   }, [isPlaying]);
 
   useEffect(() => {
-    resetControlsTimeout();
+    const frame = requestAnimationFrame(() => {
+      resetControlsTimeout();
+    });
+
     return () => {
+      cancelAnimationFrame(frame);
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
