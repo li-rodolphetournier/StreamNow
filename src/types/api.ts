@@ -56,6 +56,7 @@ export interface TMDBVideoDetails {
   first_air_date?: string;
   vote_average: number;
   vote_count: number;
+  popularity: number;
   genres: TMDBGenre[];
   production_companies: TMDBProductionCompany[];
   credits: {

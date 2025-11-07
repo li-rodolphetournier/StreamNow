@@ -4,6 +4,7 @@ import type {
   TMDBMovie,
   TMDBTVShow,
   TMDBVideoDetails,
+  TMDBGenre,
 } from "@/types/api";
 import type { Video, VideoDetails } from "@/types/video";
 
@@ -12,6 +13,14 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
 // TODO: Ajouter votre clé API TMDB dans les variables d'environnement
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || "";
+
+export type SearchSortKey = "popularity" | "vote_average" | "release_date";
+
+export type SearchOptions = {
+  mediaType?: "movie" | "tv" | "multi";
+  genre?: number;
+  sortBy?: SearchSortKey;
+};
 
 if (!TMDB_API_KEY) {
   console.warn(
@@ -42,6 +51,7 @@ function mapMovieToVideo(movie: TMDBMovie): Video {
     voteCount: movie.vote_count,
     genreIds: movie.genre_ids,
     mediaType: "movie",
+    popularity: movie.popularity,
   };
 }
 
@@ -60,6 +70,7 @@ function mapTVShowToVideo(tvShow: TMDBTVShow): Video {
     voteCount: tvShow.vote_count,
     genreIds: tvShow.genre_ids,
     mediaType: "tv",
+    popularity: tvShow.popularity,
   };
 }
 
@@ -145,7 +156,8 @@ export async function getTrendingTVShows(
  */
 export async function searchVideos(
   query: string,
-  page: number = 1
+  page: number = 1,
+  options?: SearchOptions
 ): Promise<{ videos: Video[]; totalPages: number }> {
   const response = await apiClient.get<TMDBResponse<TMDBMovie | TMDBTVShow>>(
     "/search/multi",
@@ -155,7 +167,20 @@ export async function searchVideos(
   const videos: Video[] = response.data.results
     .filter((item) => {
       const itemWithType = item as TMDBMovie | TMDBTVShow;
-      return itemWithType.media_type === "movie" || itemWithType.media_type === "tv";
+      const isValidType =
+        itemWithType.media_type === "movie" || itemWithType.media_type === "tv";
+
+      if (!isValidType) return false;
+
+      if (options?.mediaType && options.mediaType !== "multi") {
+        return itemWithType.media_type === options.mediaType;
+      }
+
+      if (options?.genre) {
+        return itemWithType.genre_ids?.includes(options.genre);
+      }
+
+      return true;
     })
     .map((item) => {
       const itemWithType = item as TMDBMovie | TMDBTVShow;
@@ -165,9 +190,29 @@ export async function searchVideos(
       return mapTVShowToVideo(item as TMDBTVShow);
     });
 
+  const sortedVideos = sortVideos(videos, options?.sortBy);
+
   return {
-    videos,
+    videos: sortedVideos,
     totalPages: response.data.total_pages,
+  };
+}
+
+/**
+ * Récupère les genres disponibles pour films et séries
+ */
+export async function getGenres(): Promise<{
+  movieGenres: TMDBGenre[];
+  tvGenres: TMDBGenre[];
+}> {
+  const [movies, tv] = await Promise.all([
+    apiClient.get<{ genres: TMDBGenre[] }>("/genre/movie/list"),
+    apiClient.get<{ genres: TMDBGenre[] }>("/genre/tv/list"),
+  ]);
+
+  return {
+    movieGenres: movies.data.genres,
+    tvGenres: tv.data.genres,
   };
 }
 
@@ -190,6 +235,7 @@ export async function getMovieDetails(id: number): Promise<VideoDetails> {
     voteCount: response.data.vote_count,
     genreIds: response.data.genres.map((g) => g.id),
     mediaType: "movie",
+    popularity: response.data.popularity,
     runtime: response.data.runtime,
     genres: response.data.genres.map((g) => ({
       id: g.id,
@@ -246,6 +292,7 @@ export async function getTVShowDetails(id: number): Promise<VideoDetails> {
     voteCount: response.data.vote_count,
     genreIds: response.data.genres.map((g) => g.id),
     mediaType: "tv",
+    popularity: response.data.popularity,
     seasons: response.data.number_of_seasons,
     episodes: response.data.number_of_episodes,
     genres: response.data.genres.map((g) => ({
@@ -282,6 +329,34 @@ export async function getTVShowDetails(id: number): Promise<VideoDetails> {
   };
 
   return details;
+}
+
+function sortVideos(videos: Video[], sortBy?: SearchSortKey) {
+  if (!sortBy) return videos;
+
+  const sorted = [...videos];
+
+  switch (sortBy) {
+    case "popularity":
+      sorted.sort(
+        (a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)
+      );
+      break;
+    case "vote_average":
+      sorted.sort((a, b) => b.voteAverage - a.voteAverage);
+      break;
+    case "release_date":
+      sorted.sort(
+        (a, b) =>
+          (b.releaseDate ? new Date(b.releaseDate).getTime() : 0) -
+          (a.releaseDate ? new Date(a.releaseDate).getTime() : 0)
+      );
+      break;
+    default:
+      break;
+  }
+
+  return sorted;
 }
 
 /**

@@ -13,6 +13,7 @@ export interface Video {
   voteCount: number;
   genreIds: number[];
   mediaType: "movie" | "tv";
+  popularity?: number;
 }
 
 export interface VideoDetails extends Video {
