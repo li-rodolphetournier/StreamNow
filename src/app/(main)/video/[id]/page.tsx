@@ -2,16 +2,17 @@ import { VideoPageContent } from "@/components/video/VideoPageContent";
 import { notFound } from "next/navigation";
 
 interface VideoPageProps {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ type?: string; play?: string }>;
+  params: { id: string };
+  searchParams?: { type?: string; play?: string };
 }
 
-export default async function VideoPage({
+export default function VideoPage({
   params,
   searchParams,
 }: VideoPageProps) {
-  const { id } = await params;
-  const { type, play } = await searchParams;
+  const { id } = params;
+  const type = searchParams?.type;
+  const play = searchParams?.play;
 
   const videoId = parseInt(id, 10);
   if (isNaN(videoId)) {
