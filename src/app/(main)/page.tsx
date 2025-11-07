@@ -4,6 +4,7 @@ import { VideoCarousel } from "@/components/video/VideoCarousel";
 import { VideoCarouselSkeleton } from "@/components/video/VideoCarouselSkeleton";
 import { HeroSection } from "@/components/shared/HeroSection";
 import { Skeleton } from "@/components/shared/Skeleton";
+import { ContinueWatchingCarousel } from "@/components/video/ContinueWatchingCarousel";
 import {
   useTrendingMovies,
   usePopularMovies,
@@ -29,6 +30,10 @@ export default function HomePage() {
       ) : (
         heroVideo && <HeroSection video={heroVideo} />
       )}
+
+      <div className="container mx-auto px-4">
+        <ContinueWatchingCarousel />
+      </div>
 
       {/* Carrousels */}
       <div className="space-y-12 py-8">

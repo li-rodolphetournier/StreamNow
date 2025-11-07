@@ -14,9 +14,16 @@ import { cn } from "@/lib/utils";
 interface VideoCardProps {
   video: Video;
   priority?: boolean;
+  progress?: number;
+  onRemove?: () => void;
 }
 
-export function VideoCard({ video, priority = false }: VideoCardProps) {
+export function VideoCard({
+  video,
+  priority = false,
+  progress,
+  onRemove,
+}: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const { isFavorite, addToFavorites, removeFromFavorites } = useVideoStore();
 
@@ -99,6 +106,15 @@ export function VideoCard({ video, priority = false }: VideoCardProps) {
           <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-xs font-medium text-white">
             {video.mediaType === "movie" ? "Film" : "Série"}
           </div>
+
+          {typeof progress === "number" && progress > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20">
+              <div
+                className="h-full bg-primary"
+                style={{ width: `${Math.min(progress, 100)}%` }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Infos sous la vignette */}
@@ -117,6 +133,25 @@ export function VideoCard({ video, priority = false }: VideoCardProps) {
               </>
             )}
           </div>
+
+          {typeof progress === "number" && progress > 0 && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{Math.round(progress)}% regardé</span>
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemove();
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Retirer
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </motion.div>
     </Link>

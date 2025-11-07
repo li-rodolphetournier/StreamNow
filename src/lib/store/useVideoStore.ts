@@ -14,6 +14,7 @@ interface VideoStore {
   isFavorite: (videoId: number) => boolean;
   addToWatchHistory: (video: Video, progress?: number) => void;
   getWatchProgress: (videoId: number) => number | undefined;
+  removeFromWatchHistory: (videoId: number) => void;
   clearWatchHistory: () => void;
 }
 
@@ -45,27 +46,33 @@ export const useVideoStore = create<VideoStore>()(
       },
 
       addToWatchHistory: (video, progress) => {
+        // Si la progression est >= 95%, considérer la vidéo comme terminée et retirer l'entrée
+        if (progress !== undefined && progress >= 95) {
+          set((state) => ({
+            watchHistory: state.watchHistory.filter(
+              (entry) => entry.video.id !== video.id
+            ),
+          }));
+          return;
+        }
+
         set((state) => {
-          const existingIndex = state.watchHistory.findIndex(
-            (h) => h.video.id === video.id
+          const filtered = state.watchHistory.filter(
+            (entry) => entry.video.id !== video.id
           );
 
           const newEntry = {
             video,
             watchedAt: Date.now(),
             progress,
-          };
+          } as const;
 
-          if (existingIndex >= 0) {
-            // Mettre à jour l'entrée existante
-            const updated = [...state.watchHistory];
-            updated[existingIndex] = newEntry;
-            return { watchHistory: updated };
-          }
+          const nextHistory = [newEntry, ...filtered].sort(
+            (a, b) => b.watchedAt - a.watchedAt
+          );
 
-          // Ajouter une nouvelle entrée
           return {
-            watchHistory: [...state.watchHistory, newEntry],
+            watchHistory: nextHistory.slice(0, 50),
           };
         });
       },
@@ -73,6 +80,14 @@ export const useVideoStore = create<VideoStore>()(
       getWatchProgress: (videoId) => {
         const entry = get().watchHistory.find((h) => h.video.id === videoId);
         return entry?.progress;
+      },
+
+      removeFromWatchHistory: (videoId) => {
+        set((state) => ({
+          watchHistory: state.watchHistory.filter(
+            (entry) => entry.video.id !== videoId
+          ),
+        }));
       },
 
       clearWatchHistory: () => {
