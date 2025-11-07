@@ -102,6 +102,12 @@ Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
 # Développement
 npm run dev
 
+# Tests unitaires (Jest + Testing Library)
+npm run test
+
+# Vérification TypeScript
+npm run type-check
+
 # Build production
 npm run build
 
@@ -138,15 +144,19 @@ npx shadcn-ui add button card input dialog carousel
 - **SSR/ISR** pour la performance
 - **next/image** pour l'optimisation des images
 - **WCAG 2.1** pour l'accessibilité
+- Lien d'évitement « Aller au contenu principal » + focus management sur `<main>`
+- Navigation clavier complète (lecteur vidéo, carrousels, filtres de recherche)
+- Annonces `aria-live` pour les états du player et des résultats de recherche
 - **Lighthouse ≥ 95** sur perf / accessibilité / SEO
 - **Dark mode** supporté
 - **Responsive design** (mobile-first)
 
 ## 🧪 Tests
 
-- Tests unitaires Jest pour les hooks
-- Tests E2E Playwright (optionnel)
-- CI/CD GitHub Actions + déploiement sur Vercel
+- Tests unitaires Jest + Testing Library (`npm run test`)
+- Vérification de typage (`npm run type-check`) et lint (`npm run lint`)
+- Pipeline CI GitHub Actions (`.github/workflows/ci.yml`) exécutant lint, type-check, tests et build à chaque push/PR
+- Tests E2E Playwright (optionnel, à planifier)
 
 ## 📝 Conventions de code
 
