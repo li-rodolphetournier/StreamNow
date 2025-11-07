@@ -131,7 +131,11 @@ NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_api_key_here
 
 - **Déploiement Vercel** :
   - Ajoutez `NEXT_PUBLIC_TMDB_API_KEY` dans les Variables d'environnement (toutes les cibles nécessaires).
-  - Ajoutez également `NPM_FLAGS = --legacy-peer-deps` pour aligner l'installation npm sur la résolution locale (React 19 + Testing Library). Sans ce flag, les builds Vercel échoueront.
+  - Deux options pour forcer `--legacy-peer-deps` :
+    - soit ajouter la variable d’environnement `NPM_FLAGS = --legacy-peer-deps` dans l’interface Vercel,
+    - soit laisser le fichier `vercel.json` fourni (déjà configuré) qui définit automatiquement `NPM_FLAGS` côté build.
+  - Un fichier `.npmrc` (commité) force également `legacy-peer-deps=true`, ce qui assure le comportement même si Vercel ignore la variable.  
+  - Sans cette configuration, les builds Vercel échoueront (conflit React 19 / Testing Library).
 
 ## 🧩 Fonctionnalités principales
 

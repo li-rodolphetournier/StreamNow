@@ -45,6 +45,8 @@ Pour des builds cohérents avec l'environnement local (React 19 + Testing Librar
    - `NPM_FLAGS = --legacy-peer-deps`
 2. Relancez un déploiement (`Redeploy`) pour que la configuration soit prise en compte.
 
+> Astuce : vous pouvez aussi laisser le fichier `vercel.json` (fourni à la racine) qui force `NPM_FLAGS` côté build Vercel, et `.npmrc` (déjà commité) définit `legacy-peer-deps=true` comme filet de sécurité.
+
 Sans la variable `NPM_FLAGS`, `npm install` échouera à cause d'un conflit de peer dependency.
 
 ## Configuration Shadcn UI
