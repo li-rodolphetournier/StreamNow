@@ -364,31 +364,10 @@ function sortVideos(videos: Video[], sortBy?: SearchSortKey) {
  */
 export async function getMovieVideos(id: number): Promise<string | null> {
   try {
-    const response = await apiClient.get<{
-      id: number;
-      results: Array<{
-        key: string;
-        site: string;
-        type: string;
-        official: boolean;
-      }>;
-    }>(`/movie/${id}/videos`);
+    const trailer = await fetchVideos(`/movie/${id}/videos`);
+    if (trailer) return trailer;
 
-    // Chercher un trailer officiel YouTube
-    const trailer = response.data.results.find(
-      (v) => v.site === "YouTube" && v.type === "Trailer" && v.official
-    );
-
-    // Sinon, prendre le premier trailer YouTube
-    const youtubeTrailer = response.data.results.find(
-      (v) => v.site === "YouTube" && v.type === "Trailer"
-    );
-
-    if (trailer || youtubeTrailer) {
-      return `https://www.youtube.com/watch?v=${trailer?.key || youtubeTrailer?.key}`;
-    }
-
-    return null;
+    return await fetchVideos(`/movie/${id}/videos`, "en-US");
   } catch (error) {
     console.error("Error fetching movie videos:", error);
     return null;
@@ -400,33 +379,43 @@ export async function getMovieVideos(id: number): Promise<string | null> {
  */
 export async function getTVShowVideos(id: number): Promise<string | null> {
   try {
-    const response = await apiClient.get<{
-      id: number;
-      results: Array<{
-        key: string;
-        site: string;
-        type: string;
-        official: boolean;
-      }>;
-    }>(`/tv/${id}/videos`);
+    const trailer = await fetchVideos(`/tv/${id}/videos`);
+    if (trailer) return trailer;
 
-    // Chercher un trailer officiel YouTube
-    const trailer = response.data.results.find(
-      (v) => v.site === "YouTube" && v.type === "Trailer" && v.official
-    );
-
-    // Sinon, prendre le premier trailer YouTube
-    const youtubeTrailer = response.data.results.find(
-      (v) => v.site === "YouTube" && v.type === "Trailer"
-    );
-
-    if (trailer || youtubeTrailer) {
-      return `https://www.youtube.com/watch?v=${trailer?.key || youtubeTrailer?.key}`;
-    }
-
-    return null;
+    return await fetchVideos(`/tv/${id}/videos`, "en-US");
   } catch (error) {
     console.error("Error fetching TV show videos:", error);
     return null;
   }
+}
+
+async function fetchVideos(endpoint: string, languageOverride?: string) {
+  const response = await apiClient.get<{
+    id: number;
+    results: Array<{
+      key: string;
+      site: string;
+      type: string;
+      official: boolean;
+    }>;
+  }>(endpoint, {
+    params: {
+      include_video_language: "fr,en",
+      ...(languageOverride ? { language: languageOverride } : {}),
+    },
+  });
+
+  const results = response.data.results.filter(
+    (video) => video.site === "YouTube" && video.type === "Trailer"
+  );
+
+  const official = results.find((video) => video.official);
+  const any = results[0];
+
+  if (!official && !any) {
+    return null;
+  }
+
+  const selected = official ?? any;
+  return `https://www.youtube.com/watch?v=${selected.key}`;
 }
