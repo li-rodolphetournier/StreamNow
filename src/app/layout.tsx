@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/shared/Providers";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { SkipLink } from "@/components/shared/SkipLink";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,8 +32,15 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
+          <SkipLink targetId="main-content" />
           <Header />
-          {children}
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="min-h-screen focus:outline-none"
+          >
+            {children}
+          </main>
           <Footer />
         </Providers>
       </body>

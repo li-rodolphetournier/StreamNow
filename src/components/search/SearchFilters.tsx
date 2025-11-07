@@ -49,10 +49,16 @@ export function SearchFilters({
   }, [mediaType, movieGenres, tvGenres]);
 
   return (
-    <div className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Type</label>
+    <section
+      aria-labelledby="search-filters-heading"
+      className="mb-6 rounded-lg border bg-card p-4 shadow-sm"
+    >
+      <h2 id="search-filters-heading" className="sr-only">
+        Filtres de recherche
+      </h2>
+      <form className="flex flex-wrap items-center gap-4" aria-describedby="search-filters-heading">
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Type</legend>
           <div className="flex items-center gap-2">
             <FilterChip
               label="Tous"
@@ -70,7 +76,7 @@ export function SearchFilters({
               onClick={() => onMediaTypeChange("tv")}
             />
           </div>
-        </div>
+        </fieldset>
 
         <div className="flex flex-col gap-2 min-w-[180px]">
           <label className="text-sm font-medium" htmlFor="genre-select">
@@ -84,6 +90,7 @@ export function SearchFilters({
               const value = event.target.value;
               onGenreChange(value ? Number(value) : null);
             }}
+            aria-describedby="genre-helper"
             disabled={isLoadingGenres || genreOptions.length === 0}
           >
             <option value="">Tous les genres</option>
@@ -93,6 +100,9 @@ export function SearchFilters({
               </option>
             ))}
           </select>
+          <span id="genre-helper" className="sr-only">
+            Sélectionner un genre limite les résultats.
+          </span>
         </div>
 
         <div className="flex flex-col gap-2 min-w-[180px]">
@@ -113,11 +123,19 @@ export function SearchFilters({
           </select>
         </div>
 
-        <Button variant="ghost" onClick={onClear} className="self-end">
+        <Button
+          variant="ghost"
+          onClick={(event) => {
+            event.preventDefault();
+            onClear();
+          }}
+          className="self-end"
+          aria-label="Effacer tous les filtres"
+        >
           Effacer les filtres
         </Button>
-      </div>
-    </div>
+      </form>
+    </section>
   );
 }
 
@@ -134,6 +152,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={
         "rounded-full px-3 py-1 text-sm transition-colors " +
         (active

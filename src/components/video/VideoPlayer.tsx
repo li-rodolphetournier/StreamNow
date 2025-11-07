@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ export function VideoPlayer({
   autoPlay = false,
   onClose,
 }: VideoPlayerProps) {
-  const [mounted, setMounted] = useState(false);
+  const [mounted] = useState(() => typeof window !== "undefined");
 
   // Récupérer l'URL de la vidéo (trailer YouTube)
   const { data: videoUrl, isLoading: isLoadingVideo } = useQuery({
@@ -57,10 +57,6 @@ export function VideoPlayer({
     playerRef,
   } = useVideoPlayer({ video, videoUrl: videoUrl || null, autoPlay });
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -88,15 +84,23 @@ export function VideoPlayer({
 
   if (!mounted || isLoadingVideo) {
     return (
-      <div className="relative aspect-video w-full bg-black flex items-center justify-center">
-        <p className="text-white">Chargement de la vidéo...</p>
+      <div
+        className="relative aspect-video w-full bg-black flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+      >
+        <p className="text-white">Chargement de la vidéo…</p>
       </div>
     );
   }
 
   if (!videoUrl) {
     return (
-      <div className="relative aspect-video w-full bg-black flex items-center justify-center">
+      <div
+        className="relative aspect-video w-full bg-black flex items-center justify-center"
+        role="alert"
+        aria-live="assertive"
+      >
         <div className="text-center space-y-4">
           <p className="text-white">Aucune vidéo disponible</p>
           {onClose && (
@@ -123,7 +127,11 @@ export function VideoPlayer({
       }}
     >
       {/* Player */}
-      <div className="relative w-full h-full">
+      <div
+        className="relative w-full h-full"
+        role="application"
+        aria-label={`Lecteur vidéo pour ${video.title}`}
+      >
         <ReactPlayer
           ref={playerRef}
           url={videoUrl}
@@ -144,6 +152,9 @@ export function VideoPlayer({
                 controls: 0,
                 modestbranding: 1,
                 rel: 0,
+              },
+              embedOptions: {
+                title: `Lecteur vidéo pour ${video.title}`,
               },
             },
           }}

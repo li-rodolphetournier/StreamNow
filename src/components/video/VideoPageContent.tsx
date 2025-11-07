@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useVideoDetails } from "@/hooks/useVideoDetails";
 import { VideoHero } from "./VideoHero";
 import { VideoDetails } from "./VideoDetails";

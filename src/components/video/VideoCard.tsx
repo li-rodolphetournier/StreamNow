@@ -93,6 +93,7 @@ export function VideoCard({
               isFav && "bg-red-500 hover:bg-red-600"
             )}
             aria-label={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+          aria-pressed={isFav}
           >
             <Heart
               className={cn(

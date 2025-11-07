@@ -41,10 +41,10 @@ export function VideoHero({ video, onPlay }: VideoHeroProps) {
   return (
     <div className="relative h-[60vh] min-h-[500px] w-full overflow-hidden">
       {/* Image de fond */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" aria-hidden>
         <Image
           src={backdropUrl}
-          alt={video.title}
+          alt=""
           fill
           priority
           className="object-cover"
@@ -102,13 +102,21 @@ export function VideoHero({ video, onPlay }: VideoHeroProps) {
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-3">
                 {onPlay ? (
-                  <Button size="lg" className="gap-2" onClick={onPlay}>
+                  <Button
+                    size="lg"
+                    className="gap-2"
+                    onClick={onPlay}
+                    aria-label={`Lancer la lecture de ${video.title}`}
+                  >
                     <Play className="h-5 w-5 fill-current" />
                     Regarder
                   </Button>
                 ) : (
                   <Button asChild size="lg" className="gap-2">
-                    <Link href={`/video/${video.id}?type=${video.mediaType}&play=true`}>
+                    <Link
+                      href={`/video/${video.id}?type=${video.mediaType}&play=true`}
+                      aria-label={`Aller à la page de lecture pour ${video.title}`}
+                    >
                       <Play className="h-5 w-5 fill-current" />
                       Regarder
                     </Link>
@@ -120,6 +128,7 @@ export function VideoHero({ video, onPlay }: VideoHeroProps) {
                   className="gap-2"
                   onClick={handleFavoriteClick}
                   aria-label={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+                  aria-pressed={isFav}
                 >
                   <Heart
                     className={cn(

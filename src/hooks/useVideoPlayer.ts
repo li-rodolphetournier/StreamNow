@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import type ReactPlayer from "react-player";
 import { useVideoStore } from "@/lib/store/useVideoStore";
 import type { Video } from "@/types/video";
 
@@ -16,23 +17,23 @@ export function useVideoPlayer({
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-  const [played, setPlayed] = useState(0);
+  const { getWatchProgress, addToWatchHistory } = useVideoStore();
+  const initialProgressRef = useRef<number | null>(null);
+  if (initialProgressRef.current === null) {
+    const saved = getWatchProgress(video.id);
+    initialProgressRef.current = saved ?? 0;
+  }
+
+  const [played, setPlayed] = useState(() => {
+    const saved = initialProgressRef.current;
+    return saved && saved > 0 ? saved / 100 : 0;
+  });
   const [playedSeconds, setPlayedSeconds] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<ReactPlayer | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const { getWatchProgress, addToWatchHistory } = useVideoStore();
-
-  // Récupérer la progression sauvegardée
-  useEffect(() => {
-    const savedProgress = getWatchProgress(video.id);
-    if (savedProgress && savedProgress > 0) {
-      setPlayed(savedProgress / 100);
-    }
-  }, [video.id, getWatchProgress]);
 
   // Sauvegarder la progression
   const saveProgress = useCallback(() => {
@@ -77,6 +78,16 @@ export function useVideoPlayer({
       }
     };
   }, [resetControlsTimeout]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  }, []);
 
   // Navigation clavier
   useEffect(() => {
@@ -132,17 +143,7 @@ export function useVideoPlayer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [videoUrl, playedSeconds, duration, resetControlsTimeout]);
-
-  const toggleFullscreen = () => {
-    if (!isFullscreen) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
+  }, [videoUrl, playedSeconds, duration, resetControlsTimeout, toggleFullscreen]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {

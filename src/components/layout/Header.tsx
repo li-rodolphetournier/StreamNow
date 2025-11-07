@@ -17,21 +17,22 @@ export function Header() {
   const isSearchPage = pathname === "/search";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" role="banner">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2">
+        <Link href="/" className="flex items-center space-x-2" aria-label="Accueil StreamNow">
           <span className="text-2xl font-bold">StreamNow</span>
         </Link>
 
         {/* Navigation */}
-        <nav className="hidden md:flex items-center space-x-6">
+        <nav className="hidden md:flex items-center space-x-6" aria-label="Navigation principale">
           <Link
             href="/"
             className={cn(
               "text-sm font-medium transition-colors hover:text-primary",
               pathname === "/" && "text-primary"
             )}
+            aria-current={pathname === "/" ? "page" : undefined}
           >
             Accueil
           </Link>
@@ -41,6 +42,7 @@ export function Header() {
               "text-sm font-medium transition-colors hover:text-primary",
               pathname === "/search" && "text-primary"
             )}
+            aria-current={pathname === "/search" ? "page" : undefined}
           >
             Recherche
           </Link>
@@ -50,6 +52,7 @@ export function Header() {
               "text-sm font-medium transition-colors hover:text-primary",
               pathname === "/favorites" && "text-primary"
             )}
+            aria-current={pathname === "/favorites" ? "page" : undefined}
           >
             Favoris
           </Link>
@@ -65,7 +68,7 @@ export function Header() {
         </div>
 
         {/* Mobile Search Button */}
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex items-center gap-2 md:hidden" aria-label="Navigation mobile">
           <Link href="/favorites">
             <Button variant="ghost" size="icon" aria-label="Favoris">
               <span className="sr-only">Favoris</span>

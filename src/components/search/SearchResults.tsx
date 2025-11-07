@@ -49,7 +49,7 @@ export function SearchResults({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-live="polite">
       <div>
         <h2 className="text-2xl font-bold mb-2">
           Résultats pour &quot;{query}&quot;

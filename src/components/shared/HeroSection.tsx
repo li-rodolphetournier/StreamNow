@@ -33,10 +33,10 @@ export function HeroSection({ video }: HeroSectionProps) {
   return (
     <div className="relative h-[80vh] min-h-[600px] w-full overflow-hidden">
       {/* Image de fond */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" aria-hidden>
         <Image
           src={backdropUrl}
-          alt={video.title}
+          alt=""
           fill
           priority
           className="object-cover"
@@ -75,7 +75,7 @@ export function HeroSection({ video }: HeroSectionProps) {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              <Button asChild size="lg" className="gap-2">
+              <Button asChild size="lg" className="gap-2" aria-label={`Regarder ${video.title}`}>
                 <Link
                   href={`/video/${video.id}?type=${video.mediaType}&play=true`}
                   prefetch
@@ -84,7 +84,7 @@ export function HeroSection({ video }: HeroSectionProps) {
                   Regarder
                 </Link>
               </Button>
-              <Button asChild variant="secondary" size="lg" className="gap-2">
+              <Button asChild variant="secondary" size="lg" className="gap-2" aria-label={`Plus d'informations sur ${video.title}`}>
                 <Link
                   href={`/video/${video.id}?type=${video.mediaType}`}
                   prefetch

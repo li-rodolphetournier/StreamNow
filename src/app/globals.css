@@ -77,6 +77,23 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+ .skip-to-content {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  z-index: 1000;
+  transition: top 0.2s ease;
+}
+
+.skip-to-content:focus-visible {
+  top: 1rem;
+}
+
 /* Utility classes */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -93,3 +110,4 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+

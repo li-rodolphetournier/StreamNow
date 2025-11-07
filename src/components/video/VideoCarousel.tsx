@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoCard } from "./VideoCard";
@@ -19,6 +19,8 @@ export function VideoCarousel({
   priority = false,
 }: VideoCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const carouselId = useId();
+  const listId = `${carouselId}-list`;
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
@@ -41,15 +43,25 @@ export function VideoCarousel({
   }
 
   return (
-    <section className="space-y-4">
+    <section
+      className="space-y-4"
+      aria-labelledby={`${carouselId}-title`}
+      role="region"
+    >
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
+        <h2
+          id={`${carouselId}-title`}
+          className="text-2xl font-bold tracking-tight"
+        >
+          {title}
+        </h2>
         <div className="flex gap-2">
           <Button
             variant="outline"
             size="icon"
             onClick={() => scroll("left")}
             aria-label="Défiler vers la gauche"
+            aria-controls={listId}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -58,6 +70,7 @@ export function VideoCarousel({
             size="icon"
             onClick={() => scroll("right")}
             aria-label="Défiler vers la droite"
+            aria-controls={listId}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -67,6 +80,9 @@ export function VideoCarousel({
       <div className="relative">
         <div
           ref={scrollRef}
+          role="list"
+          id={listId}
+          aria-label={title}
           className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
           style={{
             scrollbarWidth: "none",
@@ -75,6 +91,7 @@ export function VideoCarousel({
         >
           {videos.map((video, index) => (
             <div
+              role="listitem"
               key={video.id}
               className={cn(
                 "flex-shrink-0 w-[200px] sm:w-[240px] md:w-[280px]",
