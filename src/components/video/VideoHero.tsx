@@ -100,12 +100,12 @@ export function VideoHero({ video }: VideoHeroProps) {
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-3">
-                <Link href={`/video/${video.id}?type=${video.mediaType}&play=true`}>
-                  <Button size="lg" className="gap-2">
+                <Button asChild size="lg" className="gap-2">
+                  <Link href={`/video/${video.id}?type=${video.mediaType}&play=true`}>
                     <Play className="h-5 w-5 fill-current" />
                     Regarder
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 <Button
                   variant="secondary"
                   size="lg"

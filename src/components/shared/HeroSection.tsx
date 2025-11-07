@@ -75,24 +75,24 @@ export function HeroSection({ video }: HeroSectionProps) {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              <Link
-                href={`/video/${video.id}?type=${video.mediaType}&play=true`}
-                prefetch
-              >
-                <Button size="lg" className="gap-2">
+              <Button asChild size="lg" className="gap-2">
+                <Link
+                  href={`/video/${video.id}?type=${video.mediaType}&play=true`}
+                  prefetch
+                >
                   <Play className="h-5 w-5 fill-current" />
                   Regarder
-                </Button>
-              </Link>
-              <Link
-                href={`/video/${video.id}?type=${video.mediaType}`}
-                prefetch
-              >
-                <Button variant="secondary" size="lg" className="gap-2">
+                </Link>
+              </Button>
+              <Button asChild variant="secondary" size="lg" className="gap-2">
+                <Link
+                  href={`/video/${video.id}?type=${video.mediaType}`}
+                  prefetch
+                >
                   <Info className="h-5 w-5" />
                   Plus d&apos;infos
-                </Button>
-              </Link>
+                </Link>
+              </Button>
               <Button
                 variant="secondary"
                 size="lg"
