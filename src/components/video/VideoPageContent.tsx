@@ -65,7 +65,7 @@ export function VideoPageContent({
 
   return (
     <div className="min-h-screen">
-      <VideoHero video={video} />
+      <VideoHero video={video} onPlay={() => setShowPlayer(true)} />
       <VideoDetails video={video} />
       {video.recommendations.length > 0 && (
         <VideoRecommendations videos={video.recommendations} />

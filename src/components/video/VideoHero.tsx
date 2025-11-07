@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Play, Plus, Heart } from "lucide-react";
+import { Play, Heart, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getImageUrl } from "@/lib/api/tmdb";
 import type { VideoDetails } from "@/types/video";
@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils";
 
 interface VideoHeroProps {
   video: VideoDetails;
+  onPlay?: () => void;
 }
 
-export function VideoHero({ video }: VideoHeroProps) {
+export function VideoHero({ video, onPlay }: VideoHeroProps) {
   const { isFavorite, addToFavorites, removeFromFavorites } = useVideoStore();
   const isFav = isFavorite(video.id);
 
@@ -100,12 +101,19 @@ export function VideoHero({ video }: VideoHeroProps) {
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-3">
-                <Button asChild size="lg" className="gap-2">
-                  <Link href={`/video/${video.id}?type=${video.mediaType}&play=true`}>
+                {onPlay ? (
+                  <Button size="lg" className="gap-2" onClick={onPlay}>
                     <Play className="h-5 w-5 fill-current" />
                     Regarder
-                  </Link>
-                </Button>
+                  </Button>
+                ) : (
+                  <Button asChild size="lg" className="gap-2">
+                    <Link href={`/video/${video.id}?type=${video.mediaType}&play=true`}>
+                      <Play className="h-5 w-5 fill-current" />
+                      Regarder
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="lg"
@@ -129,6 +137,14 @@ export function VideoHero({ video }: VideoHeroProps) {
                       ({video.voteCount} votes)
                     </span>
                   </div>
+                )}
+                {!onPlay && (
+                  <Button asChild variant="secondary" size="lg" className="gap-2">
+                    <Link href={`/video/${video.id}?type=${video.mediaType}`}>
+                      <Info className="h-5 w-5" />
+                      Plus d&apos;infos
+                    </Link>
+                  </Button>
                 )}
               </div>
             </div>
