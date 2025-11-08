@@ -105,6 +105,9 @@ npm run dev
 # Tests unitaires (Jest + Testing Library)
 npm run test
 
+# Tests E2E (Playwright)
+npm run test:e2e
+
 # Vérification TypeScript
 npm run type-check
 
@@ -172,9 +175,9 @@ NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_api_key_here
 ## 🧪 Tests
 
 - Tests unitaires Jest + Testing Library (`npm run test`)
+- Tests E2E Playwright (`npm run test:e2e`)
 - Vérification de typage (`npm run type-check`) et lint (`npm run lint`)
-- Pipeline CI GitHub Actions (`.github/workflows/ci.yml`) exécutant lint, type-check, tests et build à chaque push/PR
-- Tests E2E Playwright (optionnel, à planifier)
+- Pipeline CI GitHub Actions (`.github/workflows/ci.yml`) exécutant lint, type-check, tests, build et E2E à chaque push/PR
 
 ## 📝 Conventions de code
 
