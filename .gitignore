@@ -69,3 +69,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backend api
+apps/api/dist
+apps/api/.env
+apps/api/.env.*
+!apps/api/.env.example
+apps/api/uploads/

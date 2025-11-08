@@ -2,27 +2,120 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Search, Menu } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Search, Menu, LogOut } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search/SearchBar";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useSignOut } from "@/hooks/useSignOut";
 
 function SearchBarWrapper() {
   return <SearchBar />;
 }
 
+function AuthControls({ mode = "desktop" }: { mode?: "desktop" | "mobile" }) {
+  const router = useRouter();
+  const { data: user, isLoading } = useCurrentUser();
+  const { mutate: signOut, isPending } = useSignOut();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!user) {
+    if (mode === "mobile") {
+      return (
+        <Link href="/sign-in">
+          <Button variant="ghost" size="icon" aria-label="Se connecter">
+            <Menu className="h-5 w-5" />
+          </Button>
+        </Link>
+      );
+    }
+
+    return (
+      <Button asChild size="sm">
+        <Link href="/sign-in">Se connecter</Link>
+      </Button>
+    );
+  }
+
+  if (mode === "mobile") {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Se déconnecter"
+        onClick={() =>
+          signOut(undefined, {
+            onSuccess: () => router.push("/"),
+          })
+        }
+        disabled={isPending}
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="relative h-8 w-8 overflow-hidden rounded-full border">
+          <Image
+            src={user.avatarUrl ?? "https://placehold.co/64x64"}
+            alt={user.nickname ?? user.email}
+            fill
+            className="object-cover"
+          />
+        </div>
+        <span>{user.nickname ?? user.email}</span>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() =>
+          signOut(undefined, {
+            onSuccess: () => router.push("/"),
+          })
+        }
+        disabled={isPending}
+      >
+        <LogOut className="mr-2 h-4 w-4" />
+        Déconnexion
+      </Button>
+    </div>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const isSearchPage = pathname === "/search";
+  const { data: user } = useCurrentUser();
+  const role = user?.role;
+  const canAccessDashboard = role === "ADMIN" || role === "EDITOR";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" role="banner">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2" aria-label="Accueil StreamNow">
-          <span className="text-2xl font-bold">StreamNow</span>
+        <Link
+          href="/"
+          className="flex items-center pr-6"
+          aria-label="Accueil StreamNow"
+        >
+          <div className="relative h-40 w-[260px]">
+            <Image
+              src="/logo.jpg"
+              alt="StreamNow"
+              fill
+              priority
+              className="object-contain"
+            />
+          </div>
         </Link>
 
         {/* Navigation */}
@@ -57,10 +150,32 @@ export function Header() {
           >
             Favoris
           </Link>
+          <Link
+            href="/friends"
+            className={cn(
+              "text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/friends" && "text-primary"
+            )}
+            aria-current={pathname === "/friends" ? "page" : undefined}
+          >
+            Amis
+          </Link>
+          {canAccessDashboard && (
+            <Link
+              href="/dashboard/videos"
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                pathname.startsWith("/dashboard") && "text-primary"
+              )}
+              aria-current={pathname.startsWith("/dashboard") ? "page" : undefined}
+            >
+              Dashboard
+            </Link>
+          )}
         </nav>
 
-        {/* Search Bar */}
-        <div className="flex flex-1 items-center justify-end gap-2">
+        {/* Search Bar & Auth */}
+        <div className="flex flex-1 items-center justify-end gap-4">
           <div className="hidden md:block w-full max-w-md">
             {!isSearchPage && (
               <Suspense fallback={<div className="h-10 w-full bg-muted animate-pulse rounded" />}>
@@ -68,35 +183,63 @@ export function Header() {
               </Suspense>
             )}
           </div>
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
+            <AuthControls mode="desktop" />
           </div>
         </div>
 
-        {/* Mobile Search Button */}
+        {/* Mobile Controls */}
         <div className="flex items-center gap-2 md:hidden" aria-label="Navigation mobile">
           <ThemeToggle />
-          <Link href="/favorites">
-            <Button variant="ghost" size="icon" aria-label="Favoris">
-              <span className="sr-only">Favoris</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-5 w-5"
-              >
-                <path d="M11.645 20.91a.75.75 0 0 0 .71 0c1.17-.659 4.454-2.711 6.74-5.708C21.39 12.819 22.5 10.35 22.5 8.25 22.5 5.322 20.295 3 17.625 3 15.914 3 14.331 3.879 13.32 5.348 12.31 3.879 10.726 3 9.015 3 6.345 3 4.14 5.322 4.14 8.25c0 2.1 1.11 4.569 3.405 6.952 2.286 2.997 5.57 5.05 6.74 5.708Z" />
-              </svg>
-            </Button>
-          </Link>
+          {canAccessDashboard && (
+            <Link href="/dashboard/videos">
+              <Button variant="ghost" size="icon" aria-label="Dashboard">
+                <span className="sr-only">Dashboard</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <rect x="3" y="3" width="7" height="9" rx="1" />
+                  <rect x="14" y="3" width="7" height="5" rx="1" />
+                  <rect x="14" y="12" width="7" height="9" rx="1" />
+                  <rect x="3" y="16" width="7" height="5" rx="1" />
+                </svg>
+              </Button>
+            </Link>
+          )}
           <Link href="/search">
             <Button variant="ghost" size="icon" aria-label="Rechercher">
               <Search className="h-5 w-5" />
             </Button>
           </Link>
-          <Button variant="ghost" size="icon" aria-label="Menu">
-            <Menu className="h-5 w-5" />
-          </Button>
+          <Link href="/friends">
+            <Button variant="ghost" size="icon" aria-label="Amis">
+              <span className="sr-only">Amis</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M18 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="10" cy="7" r="4" />
+                <path d="m22 21-2-2 2-2" />
+                <path d="M19 17a3 3 0 0 1 3 3" />
+              </svg>
+            </Button>
+          </Link>
+          <AuthControls mode="mobile" />
         </div>
       </div>
     </header>

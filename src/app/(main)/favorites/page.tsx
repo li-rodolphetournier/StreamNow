@@ -3,10 +3,28 @@
 import { Suspense } from "react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { VideoGrid } from "@/components/video/VideoGrid";
-import { Button } from "@/components/ui/button";
 
 function FavoritesContent() {
-  const { favorites, favoritesByMediaType, clear } = useFavorites();
+  const { favorites, favoritesByMediaType, isAuthenticated, isLoading } = useFavorites();
+
+  if (!isAuthenticated) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <h2 className="text-2xl font-bold">Connectez-vous pour voir vos favoris</h2>
+        <p className="text-muted-foreground">
+          Cette section est réservée aux utilisateurs authentifiés.
+        </p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <h2 className="text-2xl font-bold">Chargement de vos favoris…</h2>
+      </div>
+    );
+  }
 
   if (favorites.length === 0) {
     return (
@@ -28,9 +46,6 @@ function FavoritesContent() {
             {favorites.length} titre{favorites.length > 1 ? "s" : ""}
           </p>
         </div>
-        <Button variant="ghost" onClick={clear}>
-          Effacer tous les favoris
-        </Button>
       </div>
 
       {favoritesByMediaType.movies.length > 0 && (

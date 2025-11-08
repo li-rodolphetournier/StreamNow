@@ -3,10 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Play, Heart, Info } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getImageUrl } from "@/lib/api/tmdb";
 import type { VideoDetails } from "@/types/video";
-import { useVideoStore } from "@/lib/store/useVideoStore";
+import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
 
 interface VideoHeroProps {
@@ -15,17 +16,29 @@ interface VideoHeroProps {
 }
 
 export function VideoHero({ video, onPlay }: VideoHeroProps) {
-  const { isFavorite, addToFavorites, removeFromFavorites } = useVideoStore();
+  const router = useRouter();
+  const {
+    isFavorite,
+    add,
+    remove,
+    isAuthenticated,
+    addFavoriteStatus,
+    removeFavoriteStatus,
+  } = useFavorites();
   const isFav = isFavorite(video.id);
 
   const backdropUrl = getImageUrl(video.backdropPath, "w1280");
   const posterUrl = getImageUrl(video.posterPath, "w500");
 
   const handleFavoriteClick = () => {
+    if (!isAuthenticated) {
+      router.push("/auth/sign-in");
+      return;
+    }
     if (isFav) {
-      removeFromFavorites(video.id);
+      remove(video);
     } else {
-      addToFavorites(video);
+      add(video);
     }
   };
 
@@ -127,6 +140,7 @@ export function VideoHero({ video, onPlay }: VideoHeroProps) {
                   size="lg"
                   className="gap-2"
                   onClick={handleFavoriteClick}
+                  disabled={addFavoriteStatus === "pending" || removeFavoriteStatus === "pending"}
                   aria-label={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
                   aria-pressed={isFav}
                 >

@@ -17,26 +17,28 @@ function SearchPageFallback() {
   );
 }
 
-export default function SearchPage({
+export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     q?: string;
     type?: string;
     genre?: string;
     sort?: string;
-  };
+  }>;
 }) {
+  const params = await searchParams;
+
   return (
     <Suspense fallback={<SearchPageFallback />}>
       <SearchPageClient
-        initialQuery={searchParams.q ?? ""}
+        initialQuery={params.q ?? ""}
         initialMediaType={
-          (searchParams.type as "movie" | "tv" | "multi") ?? "multi"
+          (params.type as "movie" | "tv" | "multi") ?? "multi"
         }
-        initialGenre={searchParams.genre ? Number(searchParams.genre) : null}
+        initialGenre={params.genre ? Number(params.genre) : null}
         initialSort={
-          (searchParams.sort as
+          (params.sort as
             | "popularity"
             | "vote_average"
             | "release_date"

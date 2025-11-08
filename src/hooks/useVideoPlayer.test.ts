@@ -19,7 +19,7 @@ const video: Video = {
 
 beforeEach(() => {
   jest.useFakeTimers();
-  useVideoStore.setState({ favorites: [], watchHistory: [] });
+  useVideoStore.setState({ watchHistory: [] });
   localStorage.clear();
 });
 
