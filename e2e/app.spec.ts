@@ -162,7 +162,7 @@ test.beforeEach(async ({ page }) => {
 test("user can start playback from hero section", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: mockMovie.title })
+    page.getByRole("heading", { name: mockMovie.title, level: 1 })
   ).toBeVisible();
 
   await page.getByRole("link", { name: /Regarder/i }).click();
@@ -176,8 +176,12 @@ test("user can add a favorite and see it on favorites page", async ({
   page,
 }) => {
   await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: mockMovie.title, level: 1 })
+  ).toBeVisible();
   await page
     .getByRole("button", { name: /Ajouter aux favoris/i })
+    .first()
     .click();
 
   await page.goto("/favorites");
