@@ -164,6 +164,7 @@ NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_api_key_here
 - Navigation clavier complète (lecteur vidéo, carrousels, filtres de recherche)
 - Annonces `aria-live` pour les états du player et des résultats de recherche
 - **Mode hors ligne (PWA)** via `next-pwa` : service worker, page `/offline`, manifest
+- **Switch thème clair/sombre** accessible dans l’en-tête (persistance via `next-themes`)
 - **Lighthouse ≥ 95** sur perf / accessibilité / SEO
 - **Dark mode** supporté
 - **Responsive design** (mobile-first)

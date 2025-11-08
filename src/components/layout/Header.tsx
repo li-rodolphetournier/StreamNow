@@ -7,6 +7,7 @@ import { Search, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search/SearchBar";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 function SearchBarWrapper() {
   return <SearchBar />;
@@ -59,16 +60,22 @@ export function Header() {
         </nav>
 
         {/* Search Bar */}
-        <div className="flex-1 max-w-md mx-4 hidden md:block">
-          {!isSearchPage && (
-            <Suspense fallback={<div className="h-10 w-full bg-muted animate-pulse rounded" />}>
-              <SearchBarWrapper />
-            </Suspense>
-          )}
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <div className="hidden md:block w-full max-w-md">
+            {!isSearchPage && (
+              <Suspense fallback={<div className="h-10 w-full bg-muted animate-pulse rounded" />}>
+                <SearchBarWrapper />
+              </Suspense>
+            )}
+          </div>
+          <div className="hidden md:flex items-center">
+            <ThemeToggle />
+          </div>
         </div>
 
         {/* Mobile Search Button */}
         <div className="flex items-center gap-2 md:hidden" aria-label="Navigation mobile">
+          <ThemeToggle />
           <Link href="/favorites">
             <Button variant="ghost" size="icon" aria-label="Favoris">
               <span className="sr-only">Favoris</span>
