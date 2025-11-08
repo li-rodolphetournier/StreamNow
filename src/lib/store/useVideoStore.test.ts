@@ -22,52 +22,9 @@ const createVideo = (overrides: Partial<Video>): Video => ({
 });
 
 beforeEach(() => {
-  useVideoStore.setState({ favorites: [], watchHistory: [] });
+  useVideoStore.setState({ watchHistory: [] });
   localStorage.clear();
   jest.spyOn(Date, "now").mockRestore();
-});
-
-describe("useVideoStore favorites", () => {
-  it("adds videos to favorites and avoids duplicates", () => {
-    const first = createVideo({ id: 1, title: "First" });
-    const duplicate = createVideo({ id: 1, title: "First duplicate" });
-    const second = createVideo({ id: 2, title: "Second" });
-
-    act(() => {
-      useVideoStore.getState().addToFavorites(first);
-      useVideoStore.getState().addToFavorites(second);
-      useVideoStore.getState().addToFavorites(duplicate);
-    });
-
-    const { favorites, isFavorite } = useVideoStore.getState();
-    expect(favorites).toHaveLength(2);
-    expect(favorites[0].id).toBe(duplicate.id);
-    expect(isFavorite(first.id)).toBe(true);
-    expect(isFavorite(999)).toBe(false);
-  });
-
-  it("removes and clears favorites", () => {
-    const video = createVideo({ id: 7 });
-
-    act(() => {
-      useVideoStore.getState().addToFavorites(video);
-    });
-
-    expect(useVideoStore.getState().favorites).toHaveLength(1);
-
-    act(() => {
-      useVideoStore.getState().removeFromFavorites(video.id);
-    });
-
-    expect(useVideoStore.getState().favorites).toHaveLength(0);
-
-    act(() => {
-      useVideoStore.getState().addToFavorites(video);
-      useVideoStore.getState().clearFavorites();
-    });
-
-    expect(useVideoStore.getState().favorites).toHaveLength(0);
-  });
 });
 
 describe("useVideoStore watch history", () => {

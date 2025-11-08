@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Play, Heart } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getImageUrl } from "@/lib/api/tmdb";
 import type { Video } from "@/types/video";
-import { useVideoStore } from "@/lib/store/useVideoStore";
+import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
 
 interface VideoCardProps {
@@ -25,7 +26,15 @@ export function VideoCard({
   onRemove,
 }: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const { isFavorite, addToFavorites, removeFromFavorites } = useVideoStore();
+  const router = useRouter();
+  const {
+    isFavorite,
+    add,
+    remove,
+    isAuthenticated,
+    addFavoriteStatus,
+    removeFavoriteStatus,
+  } = useFavorites();
 
   const isFav = isFavorite(video.id);
   const posterUrl = getImageUrl(video.posterPath, "w500");
@@ -36,10 +45,14 @@ export function VideoCard({
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isAuthenticated) {
+      router.push("/auth/sign-in");
+      return;
+    }
     if (isFav) {
-      removeFromFavorites(video.id);
+      remove(video);
     } else {
-      addToFavorites(video);
+      add(video);
     }
   };
 
@@ -87,6 +100,7 @@ export function VideoCard({
           {/* Badge favori */}
           <button
             onClick={handleFavoriteClick}
+            disabled={addFavoriteStatus === "pending" || removeFavoriteStatus === "pending"}
             className={cn(
               "absolute top-2 right-2 p-2 rounded-full transition-colors z-10",
               "bg-black/50 hover:bg-black/70",

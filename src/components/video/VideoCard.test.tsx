@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { VideoCard } from "./VideoCard";
 
 const mockVideo = {
@@ -15,18 +16,35 @@ const mockVideo = {
   popularity: 150,
 };
 
-const addToFavorites = jest.fn();
-const removeFromFavorites = jest.fn();
+const mockFavorites = {
+  isFavorite: jest.fn(() => false),
+  add: jest.fn(),
+  remove: jest.fn(),
+  isAuthenticated: true,
+  addFavoriteStatus: "idle" as const,
+  removeFavoriteStatus: "idle" as const,
+};
 
-jest.mock("@/lib/store/useVideoStore", () => ({
-  useVideoStore: () => ({
-    isFavorite: () => false,
-    addToFavorites,
-    removeFromFavorites,
+const pushMock = jest.fn();
+
+jest.mock("next/navigation", () => ({
+  __esModule: true,
+  useRouter: () => ({
+    push: pushMock,
   }),
 }));
 
+jest.mock("@/hooks/useFavorites", () => ({
+  useFavorites: () => mockFavorites,
+}));
+
 describe("VideoCard", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFavorites.isFavorite.mockImplementation(() => false);
+    mockFavorites.isAuthenticated = true;
+  });
+
   it("renders title and rating", () => {
     render(<VideoCard video={mockVideo} />);
 
@@ -46,6 +64,24 @@ describe("VideoCard", () => {
 
     fireEvent.click(screen.getByText("Retirer"));
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds video to favorites when clicking heart", async () => {
+    render(<VideoCard video={mockVideo} />);
+    const button = screen.getByRole("button", { name: /Ajouter aux favoris/i });
+    await userEvent.click(button);
+
+    expect(mockFavorites.add).toHaveBeenCalledWith(mockVideo);
+  });
+
+  it("redirects to login when user is not authenticated", async () => {
+    mockFavorites.isAuthenticated = false;
+    render(<VideoCard video={mockVideo} />);
+    const button = screen.getByRole("button", { name: /Ajouter aux favoris/i });
+    await userEvent.click(button);
+
+    expect(pushMock).toHaveBeenCalledWith("/auth/sign-in");
+    expect(mockFavorites.add).not.toHaveBeenCalled();
   });
 });
 

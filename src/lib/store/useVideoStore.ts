@@ -2,17 +2,14 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Video } from "@/types/video";
 
+interface WatchHistoryEntry {
+  video: Video;
+  watchedAt: number;
+  progress?: number; // 0-100
+}
+
 interface VideoStore {
-  favorites: Video[];
-  watchHistory: Array<{
-    video: Video;
-    watchedAt: number;
-    progress?: number; // 0-100
-  }>;
-  addToFavorites: (video: Video) => void;
-  removeFromFavorites: (videoId: number) => void;
-  isFavorite: (videoId: number) => boolean;
-  clearFavorites: () => void;
+  watchHistory: WatchHistoryEntry[];
   addToWatchHistory: (video: Video, progress?: number) => void;
   getWatchProgress: (videoId: number) => number | undefined;
   removeFromWatchHistory: (videoId: number) => void;
@@ -22,31 +19,7 @@ interface VideoStore {
 export const useVideoStore = create<VideoStore>()(
   persist(
     (set, get) => ({
-      favorites: [],
       watchHistory: [],
-
-      addToFavorites: (video) => {
-        set((state) => {
-          const filtered = state.favorites.filter((fav) => fav.id !== video.id);
-          return {
-            favorites: [video, ...filtered],
-          };
-        });
-      },
-
-      removeFromFavorites: (videoId) => {
-        set((state) => ({
-          favorites: state.favorites.filter((f) => f.id !== videoId),
-        }));
-      },
-
-      isFavorite: (videoId) => {
-        return get().favorites.some((f) => f.id === videoId);
-      },
-
-      clearFavorites: () => {
-        set({ favorites: [] });
-      },
 
       addToWatchHistory: (video, progress) => {
         // Si la progression est >= 95%, considérer la vidéo comme terminée et retirer l'entrée
@@ -64,11 +37,11 @@ export const useVideoStore = create<VideoStore>()(
             (entry) => entry.video.id !== video.id
           );
 
-          const newEntry = {
+          const newEntry: WatchHistoryEntry = {
             video,
             watchedAt: Date.now(),
             progress,
-          } as const;
+          };
 
           const nextHistory = [newEntry, ...filtered].sort(
             (a, b) => b.watchedAt - a.watchedAt
@@ -100,7 +73,6 @@ export const useVideoStore = create<VideoStore>()(
     {
       name: "streamnow-storage",
       partialize: (state) => ({
-        favorites: state.favorites,
         watchHistory: state.watchHistory,
       }),
     }

@@ -1,18 +1,26 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComponentProps, PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 import { HeroSection } from "./HeroSection";
 import type { Video } from "@/types/video";
 
-const mockStore = {
-  addToFavorites: jest.fn(),
-  removeFromFavorites: jest.fn(),
+const mockFavorites = {
+  add: jest.fn(),
+  remove: jest.fn(),
   isFavorite: jest.fn(),
+  isAuthenticated: true,
+  favorites: [],
+  favoritesByMediaType: { movies: [], series: [] },
+  isLoading: false,
+  isError: false,
+  error: null,
+  addFavoriteStatus: "idle" as const,
+  removeFavoriteStatus: "idle" as const,
 };
 
 jest.mock("next/image", () => ({
   __esModule: true,
-  default: ({ alt, priority, fill, ...props }: ComponentProps<"img">) => {
+  default: ({ alt, priority, fill, ...props }: any) => {
     void priority;
     void fill;
     return (
@@ -38,8 +46,17 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-jest.mock("@/lib/store/useVideoStore", () => ({
-  useVideoStore: () => mockStore,
+const pushMock = jest.fn();
+
+jest.mock("next/navigation", () => ({
+  __esModule: true,
+  useRouter: () => ({
+    push: pushMock,
+  }),
+}));
+
+jest.mock("@/hooks/useFavorites", () => ({
+  useFavorites: () => mockFavorites,
 }));
 
 const video: Video = {
@@ -59,13 +76,15 @@ const video: Video = {
 describe("HeroSection", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockStore.addToFavorites.mockReset();
-    mockStore.removeFromFavorites.mockReset();
-    mockStore.isFavorite.mockReset();
+    mockFavorites.add.mockReset();
+    mockFavorites.remove.mockReset();
+    mockFavorites.isFavorite.mockReset();
+    mockFavorites.isAuthenticated = true;
+    pushMock.mockReset();
   });
 
   it("renders hero information and primary link", () => {
-    mockStore.isFavorite.mockReturnValue(false);
+    mockFavorites.isFavorite.mockReturnValue(false);
 
     render(<HeroSection video={video} />);
 
@@ -82,7 +101,7 @@ describe("HeroSection", () => {
   });
 
   it("adds video to favorites when not already present", async () => {
-    mockStore.isFavorite.mockReturnValue(false);
+    mockFavorites.isFavorite.mockReturnValue(false);
 
     render(<HeroSection video={video} />);
 
@@ -91,12 +110,12 @@ describe("HeroSection", () => {
     });
     await userEvent.click(favoriteButton);
 
-    expect(mockStore.addToFavorites).toHaveBeenCalledWith(video);
-    expect(mockStore.removeFromFavorites).not.toHaveBeenCalled();
+    expect(mockFavorites.add).toHaveBeenCalledWith(video);
+    expect(mockFavorites.remove).not.toHaveBeenCalled();
   });
 
   it("removes video from favorites when already stored", async () => {
-    mockStore.isFavorite.mockReturnValue(true);
+    mockFavorites.isFavorite.mockReturnValue(true);
 
     render(<HeroSection video={video} />);
 
@@ -105,7 +124,22 @@ describe("HeroSection", () => {
     });
     await userEvent.click(favoriteButton);
 
-    expect(mockStore.removeFromFavorites).toHaveBeenCalledWith(video.id);
-    expect(mockStore.addToFavorites).not.toHaveBeenCalled();
+    expect(mockFavorites.remove).toHaveBeenCalledWith(video);
+    expect(mockFavorites.add).not.toHaveBeenCalled();
+  });
+
+  it("redirects to sign-in when user is not authenticated", async () => {
+    mockFavorites.isAuthenticated = false;
+    mockFavorites.isFavorite.mockReturnValue(false);
+
+    render(<HeroSection video={video} />);
+
+    const favoriteButton = screen.getByRole("button", {
+      name: /Ajouter aux favoris/i,
+    });
+    await userEvent.click(favoriteButton);
+
+    expect(pushMock).toHaveBeenCalledWith("/auth/sign-in");
+    expect(mockFavorites.add).not.toHaveBeenCalled();
   });
 });
