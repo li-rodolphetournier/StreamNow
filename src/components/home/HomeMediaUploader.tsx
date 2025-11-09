@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,8 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useHomeServerHealth } from "@/hooks/useHomeServerHealth";
-import { uploadHomeMedia } from "@/lib/api/home";
-import { HomeMediaUploadResponse } from "@/types/home";
+import { useUploadManager } from "@/hooks/useUploadManager";
 
 const formatBytes = (value: number): string => {
   if (!Number.isFinite(value)) {
@@ -34,18 +32,24 @@ const formatBytes = (value: number): string => {
   return `${sized.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 };
 
-export function HomeMediaUploader() {
+interface HomeMediaUploaderProps {
+  userId: string;
+  isOwner: boolean;
+}
+
+export function HomeMediaUploader({ userId, isOwner }: HomeMediaUploaderProps) {
   const healthQuery = useHomeServerHealth();
   const isHomeConfigured = healthQuery.enabled;
   const isHomeReachable =
     isHomeConfigured && !healthQuery.isError && Boolean(healthQuery.data);
 
-  const queryClient = useQueryClient();
+  const canUpload = isOwner && isHomeReachable;
+
+  const { uploads, activeUploads, startUploads, clearCompleted } =
+    useUploadManager(userId);
 
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<HomeMediaUploadResponse | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -57,42 +61,35 @@ export function HomeMediaUploader() {
     }
   }, []);
 
-  const resetInputs = () => {
+  const resetInputs = useCallback(() => {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
     if (folderInputRef.current) {
       folderInputRef.current.value = "";
     }
-  };
+  }, []);
 
   const handleUpload = useCallback(
     async (files: FileList | File[] | null) => {
-      if (!files || files.length === 0 || !isHomeReachable) {
+      if (!files || files.length === 0 || !canUpload) {
         return;
       }
 
-      setIsUploading(true);
-      setError(null);
-
       try {
-        const payload = await uploadHomeMedia(Array.from(files));
-        setResult(payload);
-        await queryClient.invalidateQueries({
-          queryKey: ["home-media-library"],
-        });
-      } catch (uploadError) {
+        await startUploads(Array.from(files));
+        setGlobalError(null);
+      } catch (error) {
         const message =
-          uploadError instanceof Error
-            ? uploadError.message
+          error instanceof Error
+            ? error.message
             : "Une erreur inattendue est survenue pendant l'upload.";
-        setError(message);
+        setGlobalError(message);
       } finally {
-        setIsUploading(false);
         resetInputs();
       }
     },
-    [isHomeReachable, queryClient]
+    [canUpload, startUploads, resetInputs]
   );
 
   const onInputChange = useCallback(
@@ -105,45 +102,44 @@ export function HomeMediaUploader() {
   const onDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      if (!canUpload) {
+        return;
+      }
       setIsDragging(false);
       void handleUpload(event.dataTransfer?.files ?? null);
     },
-    [handleUpload]
+    [canUpload, handleUpload]
   );
 
-  const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDragging(true);
-  }, []);
+  const onDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (!canUpload) {
+        return;
+      }
+      setIsDragging(true);
+    },
+    [canUpload]
+  );
 
-  const onDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDragging(false);
-  }, []);
+  const onDragLeave = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (!canUpload) {
+        return;
+      }
+      setIsDragging(false);
+    },
+    [canUpload]
+  );
 
-  const safeReset = useCallback(() => {
-    setResult(null);
-    setError(null);
-  }, []);
-
-  const summary = useMemo(() => {
-    if (!result) {
-      return null;
-    }
-
-    const savedCount = result.savedFiles.length;
-    const savedSize = result.savedFiles.reduce(
-      (total, file) => total + file.size,
-      0
-    );
-
-    return {
-      savedCount,
-      savedSize,
-      errors: result.errors,
-      status: result.status,
-    };
-  }, [result]);
+  const hasUploads = uploads.length > 0;
+  const completedCount = useMemo(
+    () => uploads.filter((upload) => upload.status === "completed").length,
+    [uploads]
+  );
+  const hasErrors = uploads.some((upload) => upload.status === "error");
+  const isUploading = activeUploads.length > 0;
 
   if (!isHomeConfigured) {
     return (
@@ -202,6 +198,24 @@ export function HomeMediaUploader() {
     );
   }
 
+  if (!isOwner) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Consultation uniquement</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            Cette bibliothèque locale appartient à un autre compte. Vous pouvez
+            consulter les éléments partagés avec vous, mais seuls le
+            propriétaire du serveur StreamNow Home peut ajouter ou modifier des
+            fichiers locaux.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -217,7 +231,7 @@ export function HomeMediaUploader() {
             variant="outline"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={isUploading || !canUpload}
           >
             <UploadCloud className="mr-2 h-4 w-4" aria-hidden="true" />
             Ajouter des fichiers
@@ -226,7 +240,7 @@ export function HomeMediaUploader() {
             variant="outline"
             size="sm"
             onClick={() => folderInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={isUploading || !canUpload}
           >
             <FolderPlus className="mr-2 h-4 w-4" aria-hidden="true" />
             Ajouter un dossier
@@ -236,27 +250,37 @@ export function HomeMediaUploader() {
       <CardContent className="space-y-4">
         <div
           role="button"
-          tabIndex={0}
+          tabIndex={canUpload ? 0 : -1}
           className={[
             "flex h-40 flex-col items-center justify-center rounded-md border-2 border-dashed transition-colors",
             isDragging ? "border-primary bg-primary/10" : "border-muted",
             isUploading ? "opacity-70" : "opacity-100",
+            !canUpload ? "cursor-not-allowed opacity-60" : "cursor-pointer",
           ].join(" ")}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            if (!canUpload) {
+              return;
+            }
+            fileInputRef.current?.click();
+          }}
           onKeyDown={(event) => {
+            if (!canUpload) {
+              return;
+            }
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               fileInputRef.current?.click();
             }
           }}
+          aria-disabled={!canUpload}
         >
           {isUploading ? (
             <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-              <span>Upload en cours…</span>
+              <span>Uploads en arrière-plan…</span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
@@ -277,6 +301,7 @@ export function HomeMediaUploader() {
           multiple
           hidden
           onChange={onInputChange}
+          disabled={!canUpload}
         />
         <input
           ref={folderInputRef}
@@ -284,18 +309,19 @@ export function HomeMediaUploader() {
           multiple
           hidden
           onChange={onInputChange}
+          disabled={!canUpload}
         />
 
-        {error ? (
+        {globalError ? (
           <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <div className="space-y-1">
-              <p>{error}</p>
+              <p>{globalError}</p>
               <Button
                 variant="outline"
                 size="sm"
                 className="border-destructive text-destructive hover:bg-destructive/10"
-                onClick={() => setError(null)}
+                onClick={() => setGlobalError(null)}
               >
                 Réessayer
               </Button>
@@ -303,55 +329,96 @@ export function HomeMediaUploader() {
           </div>
         ) : null}
 
-        {summary ? (
-          <div className="space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-            <div className="flex items-center gap-2 font-medium">
-              <CheckCircle2
-                className="h-4 w-4 text-emerald-500"
-                aria-hidden="true"
-              />
-              <span>
-                {summary.savedCount} fichier
-                {summary.savedCount > 1 ? "s" : ""} importé
-                {summary.savedCount > 1 ? "s" : ""} (
-                {formatBytes(summary.savedSize)}).
-              </span>
-            </div>
-
-            {summary.errors.length > 0 ? (
-              <div className="space-y-1">
-                <p className="font-medium text-destructive">
-                  {summary.errors.length} élément
-                  {summary.errors.length > 1 ? "s" : ""} non importé
-                  {summary.errors.length > 1 ? "s" : ""} :
-                </p>
-                <ul className="space-y-1 text-xs text-destructive">
-                  {summary.errors.slice(0, 3).map((item) => (
-                    <li key={`${item.relativePath}-${item.reason}`}>
-                      {item.relativePath} — {item.reason}
-                    </li>
-                  ))}
-                  {summary.errors.length > 3 ? (
-                    <li>… et d&apos;autres éléments.</li>
-                  ) : null}
-                </ul>
-              </div>
-            ) : null}
-
-            <div>
+        {hasUploads ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Uploads en arrière-plan</p>
               <Button
                 variant="ghost"
-                size="xs"
-                onClick={safeReset}
-                className="px-0 text-primary hover:text-primary/80"
+                size="sm"
+                className="px-2"
+                onClick={clearCompleted}
+                disabled={completedCount === 0}
               >
-                Effacer le résumé
+                Effacer les terminés
               </Button>
             </div>
+            <div className="space-y-2">
+              {uploads.map((upload) => {
+                const progress =
+                  upload.status === "completed"
+                    ? 100
+                    : upload.size > 0
+                    ? Math.min(
+                        100,
+                        Math.round((upload.uploadedBytes / upload.size) * 100)
+                      )
+                    : 0;
+
+                return (
+                  <div
+                    key={upload.id}
+                    className="rounded-md border bg-muted/20 px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between text-sm font-medium">
+                      <span className="truncate">{upload.relativePath}</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div className="mt-2 h-2 w-full rounded-full bg-muted">
+                      <div
+                        className="h-2 rounded-full bg-primary transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {formatBytes(upload.uploadedBytes)} /{" "}
+                        {formatBytes(upload.size)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {upload.status === "completed" ? (
+                          <>
+                            <CheckCircle2 className="h-3 w-3 text-emerald-500" aria-hidden="true" />
+                            <span className="text-emerald-500">Terminé</span>
+                          </>
+                        ) : upload.status === "error" ? (
+                          <>
+                            <AlertTriangle className="h-3 w-3 text-destructive" aria-hidden="true" />
+                            <span className="text-destructive">
+                              {upload.error ?? "Erreur"}
+                            </span>
+                          </>
+                        ) : upload.status === "aborted" ? (
+                          <>
+                            <AlertTriangle className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                            <span>Annulé</span>
+                          </>
+                        ) : (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                            <span>Envoi…</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    {upload.status === "error" && upload.error ? (
+                      <p className="mt-1 text-xs text-destructive">{upload.error}</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            {hasErrors ? (
+              <p className="text-xs text-destructive">
+                Les uploads en erreur peuvent être relancés en les sélectionnant de
+                nouveau.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </CardContent>
     </Card>
   );
 }
+
 

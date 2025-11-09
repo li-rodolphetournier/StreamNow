@@ -10,6 +10,7 @@ import { registerEnumType, Field, ObjectType, ID } from "type-graphql";
 import { Video } from "./Video";
 import { VideoShare } from "./VideoShare";
 import { Favorite } from "./Favorite";
+import { LocalMediaShare } from "./LocalMediaShare";
 import { Friendship } from "./Friendship";
 
 const timestampColumnType = process.env.NODE_ENV === "test" ? "datetime" : "timestamp";
@@ -87,6 +88,18 @@ export class User {
   @Field(() => [Favorite], { nullable: true })
   @OneToMany(() => Favorite, (favorite: Favorite) => favorite.user)
   favorites?: Favorite[];
+
+  @OneToMany(
+    () => LocalMediaShare,
+    (share: LocalMediaShare) => share.owner
+  )
+  localMediaSharesSent?: LocalMediaShare[];
+
+  @OneToMany(
+    () => LocalMediaShare,
+    (share: LocalMediaShare) => share.recipient
+  )
+  localMediaSharesReceived?: LocalMediaShare[];
 
   @OneToMany(() => VideoShare, (share: VideoShare) => share.sender)
   sharesSent?: VideoShare[];

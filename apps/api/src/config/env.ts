@@ -30,5 +30,6 @@ export const env = {
   facebookClientId: process.env.FACEBOOK_CLIENT_ID,
   facebookClientSecret: process.env.FACEBOOK_CLIENT_SECRET,
   facebookRedirectUri: process.env.FACEBOOK_REDIRECT_URI,
+  serviceToken: required(process.env.SERVICE_TOKEN, "SERVICE_TOKEN"),
 };
 

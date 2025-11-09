@@ -7,6 +7,7 @@ import { ApolloServer } from "@apollo/server";
 import type { ExpressContextFunctionArgument } from "@apollo/server/express4";
 import type { Request, Response } from "express";
 import multer from "multer";
+import type { MulterError } from "multer";
 import path from "path";
 import fs from "fs";
 import { isUUID } from "class-validator";
@@ -21,15 +22,21 @@ import { verifyAccessToken } from "./lib/token";
 import cookieParser from "cookie-parser";
 
 const extractUser = (req: Request) => {
+  const serviceToken = req.header("x-service-token");
+  const hasServiceAccess =
+    typeof serviceToken === "string" && serviceToken === env.serviceToken;
+
   const rawId = req.header("x-user-id") ?? undefined;
   const rawRole = req.header("x-user-role") ?? undefined;
 
-  const userId = rawId && isUUID(rawId) ? rawId : undefined;
-  const userRole = rawRole
-    ? Object.values(UserRole).find(
-        (role) => role.toLowerCase() === rawRole.toLowerCase()
-      )
-    : undefined;
+  const userId =
+    hasServiceAccess && rawId && isUUID(rawId) ? rawId : undefined;
+  const userRole =
+    hasServiceAccess && rawRole
+      ? Object.values(UserRole).find(
+          (role) => role.toLowerCase() === rawRole.toLowerCase()
+        )
+      : undefined;
 
   return {
     userId,
@@ -55,6 +62,8 @@ const bootstrap = async () => {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
+  const MAX_UPLOAD_SIZE_BYTES = 1024 * 1024 * 1024 * 2; // 2GB
+
   const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadsDir),
     filename: (_req, file, cb) => {
@@ -67,7 +76,7 @@ const bootstrap = async () => {
   const upload = multer({
     storage,
     limits: {
-      fileSize: 1024 * 1024 * 1024 * 2, // 2GB max
+      fileSize: MAX_UPLOAD_SIZE_BYTES,
     },
   });
 
@@ -135,26 +144,44 @@ const bootstrap = async () => {
     res.json({ status: "ok" });
   });
 
-  app.post("/upload", upload.single("file"), (req: Request, res: Response) => {
-    if (!req.file) {
-      res.status(400).json({ error: "Aucun fichier reçu." });
-      return;
-    }
+  app.post("/upload", (req: Request, res: Response) => {
+    upload.single("file")(req, res, (error: unknown) => {
+      if (error) {
+        if ((error as MulterError).code === "LIMIT_FILE_SIZE") {
+          res.status(413).json({
+            error: "Le fichier est trop volumineux.",
+            maxSize: MAX_UPLOAD_SIZE_BYTES,
+          });
+          return;
+        }
 
-    logger.info(
-      {
-        userId: req.header("x-user-id"),
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
-      },
-      "video_uploaded"
-    );
+        logger.error({ error }, "upload_failed");
+        res.status(500).json({
+          error: "Échec du téléversement du fichier.",
+        });
+        return;
+      }
 
-    res.json({
-      fileUrl: `/uploads/${req.file.filename}`,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      mimeType: req.file.mimetype,
+      if (!req.file) {
+        res.status(400).json({ error: "Aucun fichier reçu." });
+        return;
+      }
+
+      logger.info(
+        {
+          userId: req.header("x-user-id"),
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+        },
+        "video_uploaded"
+      );
+
+      res.json({
+        fileUrl: `/uploads/${req.file.filename}`,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+      });
     });
   });
 

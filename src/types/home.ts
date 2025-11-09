@@ -19,6 +19,8 @@ export interface HomeMediaNode {
   children?: HomeMediaNode[];
 }
 
+export type HomeMediaAccessLevel = "owner" | "shared";
+
 export interface HomeMediaLibrary {
   generatedAt: string;
   root: HomeMediaNode;
@@ -26,21 +28,7 @@ export interface HomeMediaLibrary {
   totalVideos: number;
   totalDirectories: number;
   totalSize: number;
-}
-
-export interface HomeMediaUploadSummary {
-  relativePath: string;
-  size: number;
-}
-
-export interface HomeMediaUploadError {
-  relativePath: string;
-  reason: string;
-}
-
-export interface HomeMediaUploadResponse {
-  status: "ok" | "partial";
-  savedFiles: HomeMediaUploadSummary[];
-  errors: HomeMediaUploadError[];
+  access: HomeMediaAccessLevel;
+  allowedPaths: string[];
 }
 
