@@ -181,6 +181,25 @@ make docker-down
 
 Par défaut, Nginx relaie toutes les requêtes vers `home-server:4300`. Vous pouvez adapter la configuration dans `infrastructure/nginx/home.conf` (ajout de TLS, règles supplémentaires, etc.).
 
+### Service Windows (optionnel)
+
+Pour démarrer automatiquement StreamNow Home au démarrage de Windows :
+
+```bash
+# Construire la version production (obligatoire avant installation)
+npm run home:build
+
+# Installer le service (administrateur requis)
+make home-service-install
+
+# Supprimer le service
+make home-service-uninstall
+```
+
+Le script `make home-stop` libère le port (`4300` par défaut) en terminant les processus correspondants.
+
+> **Remarque** : les scripts PowerShell se trouvent dans `scripts/windows/`. Ils nécessitent l’exécution en mode administrateur.
+
 ### Configuration des variables d'environnement
 
 - Frontend : copiez `.env.example` ou créez `.env.local` à la racine :
@@ -194,7 +213,10 @@ Par défaut, Nginx relaie toutes les requêtes vers `home-server:4300`. Vous pou
   NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
   NEXT_PUBLIC_FACEBOOK_CLIENT_ID=your_facebook_app_id
   NEXT_PUBLIC_OAUTH_REDIRECT_URI=http://localhost:3000/auth/oauth/callback
+  NEXT_PUBLIC_HOME_SERVER_URL=http://127.0.0.1:4300
   ```
+
+  > Pour un accès via Nginx (docker), utilisez `NEXT_PUBLIC_HOME_SERVER_URL=http://localhost:8081`.
 
 - Backend : copiez `apps/api/env.example` vers `apps/api/.env` puis ajustez :
 

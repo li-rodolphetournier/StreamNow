@@ -17,6 +17,15 @@ home-build:
 home-start:
 	npm run home:start
 
+home-stop:
+	powershell -ExecutionPolicy Bypass -File scripts/windows/stop-home-server.ps1
+
+home-service-install:
+	powershell -ExecutionPolicy Bypass -File scripts/windows/install-home-service.ps1
+
+home-service-uninstall:
+	powershell -ExecutionPolicy Bypass -File scripts/windows/uninstall-home-service.ps1
+
 docker-up:
 	docker compose -f docker-compose.dev.yml up --build
 
