@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, Menu, LogOut } from "lucide-react";
+import { HardDrive, Search, Menu, LogOut } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search/SearchBar";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSignOut } from "@/hooks/useSignOut";
+import { HomeServerStatus } from "./HomeServerStatus";
 
 function SearchBarWrapper() {
   return <SearchBar />;
@@ -140,6 +141,16 @@ export function Header() {
             Favoris
           </Link>
           <Link
+            href="/home"
+            className={cn(
+              "text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/home" && "text-primary"
+            )}
+            aria-current={pathname === "/home" ? "page" : undefined}
+          >
+            Bibliothèque locale
+          </Link>
+          <Link
             href="/friends"
             className={cn(
               "text-sm font-medium transition-colors hover:text-primary",
@@ -173,6 +184,7 @@ export function Header() {
             )}
           </div>
           <div className="hidden md:flex items-center gap-3">
+            <HomeServerStatus />
             <ThemeToggle />
             {user ? (
               <Link
@@ -203,6 +215,12 @@ export function Header() {
         {/* Mobile Controls */}
         <div className="flex items-center gap-2 md:hidden" aria-label="Navigation mobile">
           <ThemeToggle />
+          <Link href="/home">
+            <Button variant="ghost" size="icon" aria-label="Bibliothèque locale">
+              <span className="sr-only">Bibliothèque locale</span>
+              <HardDrive className="h-5 w-5" />
+            </Button>
+          </Link>
           {user ? (
             <Link href="/settings/profile">
               <Button variant="ghost" size="icon" aria-label="Profil">
