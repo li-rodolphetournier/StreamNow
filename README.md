@@ -98,6 +98,11 @@ Adminer (UI base de données) est accessible sur [http://localhost:8080](http://
 # Développement
 npm run dev
 
+# Serveur local StreamNow Home
+npm run home
+npm run home:build
+npm run home:start
+
 # API GraphQL
 npm run api:dev
 
@@ -128,6 +133,53 @@ npm run lint
 # Installer un composant Shadcn
 npx shadcn-ui add button card input dialog carousel
 ```
+
+### StreamNow Home (serveur multimédia local)
+
+StreamNow Home permet de lancer un serveur multimédia local — chaque utilisateur héberge ses propres fichiers, organise ses bibliothèques et expose une API sécurisée que l’interface Next.js peut consommer.
+
+```bash
+# Lancer le serveur local en développement (Fastify + TypeScript)
+npm run home
+
+# Construire la version production
+npm run home:build
+
+# Démarrer la version compilée (dist/index.js)
+npm run home:start
+```
+
+- Les variables d'environnement se trouvent dans `apps/home-server/env.example`.
+- Par défaut, le serveur écoute `http://127.0.0.1:4300`. Une route `/health` renvoie l'état du service.
+- Le dossier média racine est configurable via `HOME_SERVER_MEDIA_ROOT` (par défaut `./media`).
+
+### Orchestration & outils
+
+Un `Makefile` centralise les commandes courantes :
+
+```bash
+# Installer les dépendances
+make install
+
+# Lancer le front Next.js
+make dev
+
+# Lancer StreamNow Home
+make home
+
+# Démarrer la stack Docker (Postgres, Redis, Home server, Nginx)
+make docker-up
+
+# Arrêter la stack Docker
+make docker-down
+```
+
+`docker-compose.dev.yml` a été étendu avec :
+
+- `home-server` : build via `apps/home-server/Dockerfile`, sert l’API locale et le streaming.
+- `nginx` : reverse proxy de façade (port 8081) pour sécuriser l’accès HTTP depuis votre réseau.
+
+Par défaut, Nginx relaie toutes les requêtes vers `home-server:4300`. Vous pouvez adapter la configuration dans `infrastructure/nginx/home.conf` (ajout de TLS, règles supplémentaires, etc.).
 
 ### Configuration des variables d'environnement
 
@@ -163,6 +215,16 @@ npx shadcn-ui add button card input dialog carousel
 
   ```bash
   npm run typeorm --workspace apps/api migration:run
+  ```
+
+- StreamNow Home : copiez `apps/home-server/env.example` vers `apps/home-server/.env` (ou définissez `HOME_SERVER_ENV_FILE`) :
+
+  ```env
+  NODE_ENV=development
+  HOME_SERVER_PORT=4300
+  HOME_SERVER_HOST=127.0.0.1
+  HOME_SERVER_MEDIA_ROOT=./media
+  HOME_SERVER_LOG_LEVEL=info
   ```
 
 - **Déploiement Vercel** :
