@@ -405,4 +405,259 @@ describe("AuthResolver", () => {
     const data = unwrap<{ me: { email: string } | null }>(response);
     expect(data.me?.email).toBe("new-user@example.com");
   });
+
+  it("updates profile information", async () => {
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ email: "new-user@example.com" });
+
+    const context = createTestContext({
+      userId: user.id,
+      userRole: user.role,
+    });
+
+    const response = await server.executeOperation(
+      {
+        query: /* GraphQL */ `
+          mutation UpdateProfile($input: UpdateProfileInput!) {
+            updateProfile(input: $input) {
+              id
+              nickname
+              avatarUrl
+              bio
+            }
+          }
+        `,
+        variables: {
+          input: {
+            nickname: "  Cinéphile  ",
+            avatarUrl: "http://localhost:4000/uploads/avatar.jpg",
+            bio: " Passionné de streaming ",
+          },
+        },
+      },
+      { contextValue: context }
+    );
+
+    const data = unwrap<{
+      updateProfile: { id: string; nickname?: string | null; avatarUrl: string; bio?: string | null };
+    }>(response);
+
+    expect(data.updateProfile.id).toBe(user.id);
+    expect(data.updateProfile.nickname).toBe("Cinéphile");
+    expect(data.updateProfile.avatarUrl).toBe("http://localhost:4000/uploads/avatar.jpg");
+    expect(data.updateProfile.bio).toBe("Passionné de streaming");
+
+    const updatedUser = await userRepo.findOneByOrFail({ id: user.id });
+    expect(updatedUser.nickname).toBe("Cinéphile");
+    expect(updatedUser.avatarUrl).toBe("http://localhost:4000/uploads/avatar.jpg");
+    expect(updatedUser.bio).toBe("Passionné de streaming");
+  });
+
+  it("accepts optional fields when values are cleared", async () => {
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ email: "new-user@example.com" });
+
+    const context = createTestContext({
+      userId: user.id,
+      userRole: user.role,
+    });
+
+    const response = await server.executeOperation(
+      {
+        query: /* GraphQL */ `
+          mutation UpdateProfile($input: UpdateProfileInput!) {
+            updateProfile(input: $input) {
+              id
+              nickname
+              bio
+            }
+          }
+        `,
+        variables: {
+          input: {
+            nickname: "  Streamer ",
+            bio: " ",
+          },
+        },
+      },
+      { contextValue: context }
+    );
+
+    const data = unwrap<{ updateProfile: { id: string; nickname?: string | null; bio?: string | null } }>(
+      response
+    );
+
+    expect(data.updateProfile.id).toBe(user.id);
+    expect(data.updateProfile.nickname).toBe("Streamer");
+    expect(data.updateProfile.bio).toBeNull();
+
+    const refreshed = await userRepo.findOneByOrFail({ id: user.id });
+    expect(refreshed.bio).toBeNull();
+  });
+
+  it("updates only the nickname", async () => {
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ email: "new-user@example.com" });
+
+    const context = createTestContext({
+      userId: user.id,
+      userRole: user.role,
+    });
+
+    const response = await server.executeOperation(
+      {
+        query: /* GraphQL */ `
+          mutation UpdateProfile($input: UpdateProfileInput!) {
+            updateProfile(input: $input) {
+              id
+              nickname
+              avatarUrl
+              bio
+            }
+          }
+        `,
+        variables: {
+          input: { nickname: "Fan de SF" },
+        },
+      },
+      { contextValue: context }
+    );
+
+    const data = unwrap<{
+      updateProfile: { id: string; nickname?: string | null; avatarUrl: string; bio?: string | null };
+    }>(response);
+
+    expect(data.updateProfile.id).toBe(user.id);
+    expect(data.updateProfile.nickname).toBe("Fan de SF");
+    expect(data.updateProfile.avatarUrl).toBe("http://localhost:4000/uploads/avatar.jpg");
+    expect(data.updateProfile.bio).toBeNull();
+
+    const refreshed = await userRepo.findOneByOrFail({ id: user.id });
+    expect(refreshed.nickname).toBe("Fan de SF");
+    expect(refreshed.avatarUrl).toBe("http://localhost:4000/uploads/avatar.jpg");
+    expect(refreshed.bio).toBeNull();
+  });
+
+  it("updates only the bio", async () => {
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ email: "new-user@example.com" });
+
+    const context = createTestContext({
+      userId: user.id,
+      userRole: user.role,
+    });
+
+    const response = await server.executeOperation(
+      {
+        query: /* GraphQL */ `
+          mutation UpdateProfile($input: UpdateProfileInput!) {
+            updateProfile(input: $input) {
+              id
+              nickname
+              avatarUrl
+              bio
+            }
+          }
+        `,
+        variables: {
+          input: { bio: "Toujours partant pour un marathon de séries." },
+        },
+      },
+      { contextValue: context }
+    );
+
+    const data = unwrap<{
+      updateProfile: { id: string; nickname?: string | null; avatarUrl: string; bio?: string | null };
+    }>(response);
+
+    expect(data.updateProfile.id).toBe(user.id);
+    expect(data.updateProfile.nickname).toBe("Fan de SF");
+    expect(data.updateProfile.avatarUrl).toBe("http://localhost:4000/uploads/avatar.jpg");
+    expect(data.updateProfile.bio).toBe("Toujours partant pour un marathon de séries.");
+
+    const refreshed = await userRepo.findOneByOrFail({ id: user.id });
+    expect(refreshed.nickname).toBe("Fan de SF");
+    expect(refreshed.avatarUrl).toBe("http://localhost:4000/uploads/avatar.jpg");
+    expect(refreshed.bio).toBe("Toujours partant pour un marathon de séries.");
+  });
+
+  it("updates only the avatar url", async () => {
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ email: "new-user@example.com" });
+
+    const context = createTestContext({
+      userId: user.id,
+      userRole: user.role,
+    });
+
+    const response = await server.executeOperation(
+      {
+        query: /* GraphQL */ `
+          mutation UpdateProfile($input: UpdateProfileInput!) {
+            updateProfile(input: $input) {
+              id
+              nickname
+              avatarUrl
+              bio
+            }
+          }
+        `,
+        variables: {
+          input: { avatarUrl: "http://localhost:4000/uploads/avatar-new.jpg" },
+        },
+      },
+      { contextValue: context }
+    );
+
+    const data = unwrap<{
+      updateProfile: { id: string; nickname?: string | null; avatarUrl: string; bio?: string | null };
+    }>(response);
+
+    expect(data.updateProfile.id).toBe(user.id);
+    expect(data.updateProfile.nickname).toBe("Fan de SF");
+    expect(data.updateProfile.avatarUrl).toBe("http://localhost:4000/uploads/avatar-new.jpg");
+    expect(data.updateProfile.bio).toBe("Toujours partant pour un marathon de séries.");
+
+    const refreshed = await userRepo.findOneByOrFail({ id: user.id });
+    expect(refreshed.nickname).toBe("Fan de SF");
+    expect(refreshed.avatarUrl).toBe("http://localhost:4000/uploads/avatar-new.jpg");
+    expect(refreshed.bio).toBe("Toujours partant pour un marathon de séries.");
+  });
+
+  it("rejects invalid profile updates", async () => {
+    const userRepo = AppDataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ email: "new-user@example.com" });
+
+    const context = createTestContext({
+      userId: user.id,
+      userRole: user.role,
+    });
+
+    const response = await server.executeOperation(
+      {
+        query: /* GraphQL */ `
+          mutation UpdateProfile($input: UpdateProfileInput!) {
+            updateProfile(input: $input) {
+              id
+            }
+          }
+        `,
+        variables: {
+          input: {
+            nickname: "ab",
+            avatarUrl: "notaurl",
+          },
+        },
+      },
+      { contextValue: context }
+    );
+
+    if (response.body.kind !== "single") {
+      throw new Error("Expected single result");
+    }
+
+    const result = response.body.singleResult;
+    expect(result?.data?.updateProfile).toBeUndefined();
+    expect(result?.errors?.[0]?.message).toContain("Argument Validation Error");
+  });
 });

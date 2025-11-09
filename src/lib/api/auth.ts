@@ -18,6 +18,7 @@ const SIGN_UP_MUTATION = /* GraphQL */ `
         role
         nickname
         avatarUrl
+        bio
       }
     }
   }
@@ -34,6 +35,7 @@ const SIGN_IN_MUTATION = /* GraphQL */ `
         role
         nickname
         avatarUrl
+        bio
       }
     }
   }
@@ -56,6 +58,7 @@ const OAUTH_SIGN_IN_MUTATION = /* GraphQL */ `
         role
         nickname
         avatarUrl
+        bio
       }
     }
   }
@@ -69,6 +72,7 @@ const ME_QUERY = /* GraphQL */ `
       role
       nickname
       avatarUrl
+      bio
     }
   }
 `;
