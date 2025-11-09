@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/api"
+    "apps/api",
+    "apps/home-server"
   ],
   "scripts": {
     "dev": "next dev",
@@ -17,7 +18,10 @@
     "test:api": "jest --config apps/api/jest.config.ts",
     "test:e2e": "playwright test",
     "api:dev": "npm run dev --workspace apps/api",
-    "api:build": "npm run build --workspace apps/api"
+    "api:build": "npm run build --workspace apps/api",
+    "home": "npm run dev --workspace apps/home-server",
+    "home:build": "npm run build --workspace apps/home-server",
+    "home:start": "npm run start --workspace apps/home-server"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
