@@ -22,6 +22,8 @@ Frontend (`.env.local`) :
 ```env
 NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_api_key_here
 NEXT_PUBLIC_API_URL=http://localhost:4000/graphql
+NEXT_PUBLIC_HOME_SERVER_URL=http://localhost:8081
+NEXT_PUBLIC_HOME_SERVER_OWNER_ID=00000000-0000-0000-0000-000000000000
 # Variables désormais optionnelles (plus nécessaires une fois l'auth en place)
 # NEXT_PUBLIC_DEV_USER_ID=editor-demo
 # NEXT_PUBLIC_DEV_USER_ROLE=editor
@@ -45,7 +47,10 @@ JWT_SECRET=change-me
 REFRESH_TOKEN_SECRET=change-me-too
 ACCESS_TOKEN_TTL=15m
 REFRESH_TOKEN_TTL=30d
+SERVICE_TOKEN=change-me-service-token
 ```
+
+> `SERVICE_TOKEN` autorise les appels du serveur StreamNow Home. Générer une valeur forte (ex : `openssl rand -hex 32` ou `powershell -Command "[guid]::NewGuid()"`).
 
 ### Providers OAuth
 
@@ -66,6 +71,40 @@ FACEBOOK_REDIRECT_URI=http://localhost:4000/auth/facebook/callback
 docker compose -f docker-compose.dev.yml up -d
 ```
 
+### Serveur domestique StreamNow Home
+
+1. Copier le fichier d'exemple puis renseigner les variables indispensables :
+
+```bash
+cp apps/home-server/env.example apps/home-server/.env
+```
+
+2. Pour un usage local classique :
+
+```env
+HOME_SERVER_OWNER_ID=00000000-0000-0000-0000-000000000000  # UUID du propriétaire
+HOME_SERVER_OWNER_ROLE=ADMIN
+HOME_SERVER_GRAPHQL_URL=http://host.docker.internal:4000/graphql
+HOME_SERVER_SERVICE_TOKEN=change-me-service-token
+HOME_SERVER_SHARE_CACHE_TTL=10
+```
+
+La valeur `HOME_SERVER_SERVICE_TOKEN` doit être identique au `SERVICE_TOKEN` défini côté API.
+
+3. Si vous utilisez Docker Compose, exportez les variables avant `make docker-up` / `docker compose` (PowerShell) :
+
+```powershell
+$Env:HOME_SERVER_OWNER_ID="00000000-0000-0000-0000-000000000000"
+$Env:HOME_SERVER_OWNER_ROLE="ADMIN"
+$Env:HOME_SERVER_GRAPHQL_URL="http://host.docker.internal:4000/graphql"
+$Env:HOME_SERVER_SERVICE_TOKEN="change-me-service-token"
+$Env:HOME_SERVER_SHARE_CACHE_TTL="10"
+$Env:SERVICE_TOKEN="change-me-service-token"
+$Env:NEXT_PUBLIC_HOME_SERVER_OWNER_ID=$Env:HOME_SERVER_OWNER_ID
+```
+
+> Sous bash : utiliser `export HOME_SERVER_OWNER_ID=...` etc. Ces variables sont lues par `docker-compose.dev.yml` pour alimenter le conteneur `home-server`.
+
 4. **Lancer les applications**
 
 ```bash
@@ -79,6 +118,7 @@ npm run api:dev
 - Frontend : [http://localhost:3000](http://localhost:3000)
 - GraphQL Playground : [http://localhost:4000/graphql](http://localhost:4000/graphql)
 - Adminer : [http://localhost:8080](http://localhost:8080) (serveur par défaut `postgres`, user `postgres`, password `postgres`)
+- StreamNow Home (reverse proxy Nginx) : [http://localhost:8081](http://localhost:8081)
 
 5. **Appliquer les migrations TypeORM (après démarrage de Postgres)**
 

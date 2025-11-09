@@ -94,6 +94,14 @@ export interface GraphQLFriendRequest {
   createdAt: string;
 }
 
+export interface GraphQLLocalMediaShare {
+  id: string;
+  path: string;
+  isDirectory: boolean;
+  createdAt: string;
+  recipient: GraphQLUser;
+}
+
 export interface AddVideoInputVariables {
   tmdbId: number;
   mediaType: GraphQLVideoMediaType;

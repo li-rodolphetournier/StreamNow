@@ -41,19 +41,6 @@ export default function AddVideoPage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useRequireAuth();
 
-  if (isAuthLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Skeleton className="h-8 w-48 mb-6" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
   const [mode, setMode] = useState<FormMode>("tmdb");
   const [mediaType, setMediaType] = useState<GraphQLVideoMediaType>("MOVIE");
   const [status, setStatus] = useState<GraphQLVideoStatus>("DRAFT");
@@ -70,6 +57,19 @@ export default function AddVideoPage() {
   const createLocalVideoMutation = useCreateLocalVideo();
   const isImportPending = addVideoMutation.status === "pending";
   const isLocalPending = createLocalVideoMutation.status === "pending";
+
+  if (isAuthLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Skeleton className="h-8 w-48 mb-6" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const tmdbQueryMediaType = useMemo(() => mediaType ?? "MOVIE", [mediaType]);
   const { data: tmdbResults = [], isFetching: isSearching } = useTmdbSearch(

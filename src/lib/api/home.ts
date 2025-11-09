@@ -1,7 +1,4 @@
-import {
-  HomeMediaLibrary,
-  HomeMediaUploadResponse,
-} from "@/types/home";
+import { HomeMediaLibrary } from "@/types/home";
 
 const homeEndpoint = process.env.NEXT_PUBLIC_HOME_SERVER_URL;
 
@@ -40,12 +37,15 @@ export async function fetchHomeHealth(): Promise<HomeHealthResponse> {
   return (await response.json()) as HomeHealthResponse;
 }
 
-export async function fetchHomeMediaLibrary(): Promise<HomeMediaLibrary> {
+export async function fetchHomeMediaLibrary(userId: string): Promise<HomeMediaLibrary> {
   const endpoint = assertHomeEndpoint();
 
   const response = await fetch(`${endpoint}/api/v1/media`, {
     method: "GET",
     credentials: "include",
+    headers: {
+      "x-user-id": userId,
+    },
   });
 
   if (!response.ok) {
@@ -57,39 +57,55 @@ export async function fetchHomeMediaLibrary(): Promise<HomeMediaLibrary> {
   return (await response.json()) as HomeMediaLibrary;
 }
 
-export async function uploadHomeMedia(
-  files: File[]
-): Promise<HomeMediaUploadResponse> {
+export async function deleteHomeMedia(relativePath: string, userId: string): Promise<void> {
   const endpoint = assertHomeEndpoint();
+  const url = new URL(`${endpoint}/api/v1/media`);
+  url.searchParams.set("path", relativePath);
 
-  if (!files.length) {
-    throw new Error("Aucun fichier sélectionné.");
-  }
-
-  const formData = new FormData();
-
-  files.forEach((file) => {
-    const withRelative = file as File & { webkitRelativePath?: string };
-    const relativePath =
-      withRelative.webkitRelativePath && withRelative.webkitRelativePath.length > 0
-        ? withRelative.webkitRelativePath
-        : file.name;
-
-    formData.append("files", file, relativePath);
-  });
-
-  const response = await fetch(`${endpoint}/api/v1/media/upload`, {
-    method: "POST",
-    body: formData,
+  const response = await fetch(url.toString(), {
+    method: "DELETE",
     credentials: "include",
+    headers: {
+      "x-user-id": userId,
+    },
   });
 
-  if (!response.ok && response.status !== 207) {
+  if (!response.ok) {
     const message = await response.text();
     throw new Error(
-      `Échec de l'upload vers StreamNow Home (statut ${response.status})${message ? ` : ${message}` : ""}`
+      `Échec de la suppression du média (statut ${response.status})${
+        message ? ` : ${message}` : ""
+      }`
     );
   }
+}
 
-  return (await response.json()) as HomeMediaUploadResponse;
+export async function moveHomeMedia(
+  sourcePath: string,
+  destinationPath: string,
+  userId: string
+): Promise<void> {
+  const endpoint = assertHomeEndpoint();
+
+  const response = await fetch(`${endpoint}/api/v1/media/move`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": userId,
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      sourcePath,
+      destinationPath,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(
+      `Échec du déplacement du média (statut ${response.status})${
+        message ? ` : ${message}` : ""
+      }`
+    );
+  }
 }

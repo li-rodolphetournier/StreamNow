@@ -1,9 +1,9 @@
 import "reflect-metadata";
 import { DataSource, type DataSourceOptions } from "typeorm";
 import { env } from "./env";
-import { User, Video, Friendship, VideoShare, Favorite } from "../entities";
+import { User, Video, Friendship, VideoShare, Favorite, LocalMediaShare } from "../entities";
 
-const entities = [User, Video, Friendship, VideoShare, Favorite];
+const entities = [User, Video, Friendship, VideoShare, Favorite, LocalMediaShare];
 
 const dataSourceOptions: DataSourceOptions =
   env.nodeEnv === "test"
