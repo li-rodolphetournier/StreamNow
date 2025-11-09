@@ -4,6 +4,7 @@ import {
   Mutation,
   Query,
   Resolver,
+  Authorized,
 } from "type-graphql";
 import { Repository } from "typeorm";
 import { hash, verify } from "argon2";
@@ -16,10 +17,10 @@ import { AuthPayload } from "../outputs/AuthPayload";
 import { authService } from "../services/auth.service";
 import { verifyRefreshToken } from "../lib/token";
 import { GraphQLError } from "graphql";
-import type { Response } from "express";
 import { OAuthSignInInput } from "../inputs/OAuthSignInInput";
-import { OAuthProvider } from "../types/oauth";
 import { oauthService } from "../services/oauth.service";
+import { UpdateProfileInput } from "../inputs/UpdateProfileInput";
+import type { Response } from "express";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
 
@@ -186,6 +187,7 @@ export class AuthResolver {
     return true;
   }
 
+  @Authorized()
   @Query(() => User, { nullable: true })
   async me(@Ctx() ctx: GraphQLContext): Promise<User | null> {
     if (!ctx.userId) {
@@ -193,5 +195,42 @@ export class AuthResolver {
     }
 
     return this.userRepository.findOne({ where: { id: ctx.userId } });
+  }
+
+  @Authorized()
+  @Mutation(() => User)
+  async updateProfile(
+    @Arg("input") input: UpdateProfileInput,
+    @Ctx() ctx: GraphQLContext
+  ): Promise<User> {
+    if (!ctx.userId) {
+      throw new GraphQLError("Authentification requise.");
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: ctx.userId },
+    });
+
+    if (!user) {
+      throw new GraphQLError("Utilisateur introuvable.");
+    }
+
+    if (typeof input.nickname === "string") {
+      const trimmed = input.nickname.trim();
+      user.nickname = trimmed.length > 0 ? trimmed : null;
+    }
+
+    if (typeof input.avatarUrl === "string") {
+      const trimmed = input.avatarUrl.trim();
+      user.avatarUrl = trimmed.length > 0 ? trimmed : user.avatarUrl;
+    }
+
+    if (typeof input.bio === "string") {
+      const trimmed = input.bio.trim();
+      user.bio = trimmed.length > 0 ? trimmed : null;
+    }
+
+    await this.userRepository.save(user);
+    return user;
   }
 }

@@ -12,6 +12,8 @@ import { VideoShare } from "./VideoShare";
 import { Favorite } from "./Favorite";
 import { Friendship } from "./Friendship";
 
+const timestampColumnType = process.env.NODE_ENV === "test" ? "datetime" : "timestamp";
+
 export enum UserRole {
   ADMIN = "admin",
   EDITOR = "editor",
@@ -44,12 +46,19 @@ export class User {
   })
   role!: UserRole;
 
-  @Field({ nullable: true })
-  @Column({ nullable: true })
-  nickname?: string;
+  @Field(() => String, { nullable: true })
+  @Column({ nullable: true, type: "text" })
+  nickname?: string | null;
+
+  @Field(() => String, { nullable: true })
+  @Column({ type: "varchar", length: 240, nullable: true })
+  bio?: string | null;
 
   @Field()
-  @Column({ name: "avatar_url", default: "https://placehold.co/128x128" })
+  @Column({
+    name: "avatar_url",
+    default: "https://placehold.co/128x128/png",
+  })
   avatarUrl!: string;
 
   @Field(() => String, { nullable: true })
@@ -61,7 +70,7 @@ export class User {
   facebookId?: string | null;
 
   @Field(() => Date, { nullable: true })
-  @Column({ name: "email_verified_at", type: "timestamp", nullable: true })
+  @Column({ name: "email_verified_at", type: timestampColumnType, nullable: true })
   emailVerifiedAt?: Date | null;
 
   @Field(() => Date)

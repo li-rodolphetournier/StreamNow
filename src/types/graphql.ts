@@ -45,6 +45,7 @@ export interface GraphQLUser extends GraphQLUserSmall {
   role: GraphQLUserRole;
   nickname?: string | null;
   avatarUrl?: string | null;
+  bio?: string | null;
 }
 
 export interface GraphQLVideo {
@@ -157,6 +158,12 @@ export interface FriendRequestInputVariables {
 export interface RespondFriendRequestInputVariables {
   id: string;
   accept: boolean;
+}
+
+export interface UpdateProfileInputVariables {
+  nickname?: string;
+  avatarUrl?: string;
+  bio?: string;
 }
 
 export interface GraphQLAuthPayload {

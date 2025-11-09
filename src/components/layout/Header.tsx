@@ -62,32 +62,19 @@ function AuthControls({ mode = "desktop" }: { mode?: "desktop" | "mobile" }) {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-        <div className="relative h-8 w-8 overflow-hidden rounded-full border">
-          <Image
-            src={user.avatarUrl ?? "https://placehold.co/64x64"}
-            alt={user.nickname ?? user.email}
-            fill
-            className="object-cover"
-          />
-        </div>
-        <span>{user.nickname ?? user.email}</span>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() =>
-          signOut(undefined, {
-            onSuccess: () => router.push("/"),
-          })
-        }
-        disabled={isPending}
-      >
-        <LogOut className="mr-2 h-4 w-4" />
-        Déconnexion
-      </Button>
-    </div>
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() =>
+        signOut(undefined, {
+          onSuccess: () => router.push("/"),
+        })
+      }
+      disabled={isPending}
+    >
+      <LogOut className="mr-2 h-4 w-4" />
+      Déconnexion
+    </Button>
   );
 }
 
@@ -97,6 +84,8 @@ export function Header() {
   const { data: user } = useCurrentUser();
   const role = user?.role;
   const canAccessDashboard = role === "ADMIN" || role === "EDITOR";
+  const avatarSrc = user?.avatarUrl ?? "https://placehold.co/128x128/png";
+  const unoptimizedAvatar = avatarSrc.startsWith("http://localhost");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" role="banner">
@@ -185,6 +174,28 @@ export function Header() {
           </div>
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
+            {user ? (
+              <Link
+                href="/settings/profile"
+                className="group flex items-center gap-2 rounded-md border px-3 py-2 hover:bg-muted transition-colors"
+              >
+                <div className="relative h-9 w-9 overflow-hidden rounded-full border">
+                  <Image
+                src={avatarSrc}
+                    alt={user.nickname ?? user.email}
+                    fill
+                    className="object-cover"
+                unoptimized={unoptimizedAvatar}
+                  />
+                </div>
+                <div className="text-left leading-tight">
+                  <p className="text-sm font-semibold group-hover:text-primary transition-colors">
+                    {user.nickname ?? user.email}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Mon profil</p>
+                </div>
+              </Link>
+            ) : null}
             <AuthControls mode="desktop" />
           </div>
         </div>
@@ -192,6 +203,21 @@ export function Header() {
         {/* Mobile Controls */}
         <div className="flex items-center gap-2 md:hidden" aria-label="Navigation mobile">
           <ThemeToggle />
+          {user ? (
+            <Link href="/settings/profile">
+              <Button variant="ghost" size="icon" aria-label="Profil">
+                <div className="relative h-8 w-8 overflow-hidden rounded-full border">
+                  <Image
+                    src={avatarSrc}
+                    alt={user.nickname ?? user.email}
+                    fill
+                    className="object-cover"
+                    unoptimized={unoptimizedAvatar}
+                  />
+                </div>
+              </Button>
+            </Link>
+          ) : null}
           {canAccessDashboard && (
             <Link href="/dashboard/videos">
               <Button variant="ghost" size="icon" aria-label="Dashboard">

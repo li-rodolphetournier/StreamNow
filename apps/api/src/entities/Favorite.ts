@@ -11,6 +11,11 @@ import { Field, Float, ID, Int, ObjectType } from "type-graphql";
 import { User } from "./User";
 import { VideoMediaType } from "./Video";
 
+const genreIdsColumnOptions =
+  process.env.NODE_ENV === "test"
+    ? { type: "simple-json" as const, default: "[]" }
+    : { type: "jsonb" as const, default: () => "'[]'" };
+
 @ObjectType()
 @Entity("favorites")
 @Index("UQ_favorite_user_tmdb", ["user", "tmdbId", "mediaType"], { unique: true })
@@ -66,7 +71,7 @@ export class Favorite {
   voteCount?: number | null;
 
   @Field(() => [Int])
-  @Column({ name: "genre_ids", type: "jsonb", default: () => "'[]'" })
+  @Column({ name: "genre_ids", ...genreIdsColumnOptions })
   genreIds!: number[];
 
   @Field(() => Date)
