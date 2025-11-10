@@ -90,20 +90,21 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" role="banner">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container mx-auto flex h-20 items-center justify-between px-4">
         {/* Logo */}
         <Link
           href="/"
           className="flex items-center pr-6"
           aria-label="Accueil StreamNow"
         >
-          <div className="relative h-40 w-[260px]">
+          <div className="relative h-16 w-[200px] sm:h-20 sm:w-[260px]">
             <Image
               src="/logo.jpg"
               alt="StreamNow"
               fill
               priority
               className="object-contain"
+              sizes="(max-width: 640px) 200px, 260px"
             />
           </div>
         </Link>
@@ -193,11 +194,12 @@ export function Header() {
               >
                 <div className="relative h-9 w-9 overflow-hidden rounded-full border">
                   <Image
-                src={avatarSrc}
+                    src={avatarSrc}
                     alt={user.nickname ?? user.email}
                     fill
                     className="object-cover"
-                unoptimized={unoptimizedAvatar}
+                    unoptimized={unoptimizedAvatar}
+                    sizes="36px"
                   />
                 </div>
                 <div className="text-left leading-tight">
@@ -231,6 +233,7 @@ export function Header() {
                     fill
                     className="object-cover"
                     unoptimized={unoptimizedAvatar}
+                    sizes="32px"
                   />
                 </div>
               </Button>

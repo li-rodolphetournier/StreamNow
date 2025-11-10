@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamnow-redis
+  namespace: streamnow
+spec:
+  type: ClusterIP
+  selector:
+    app: streamnow-redis
+  ports:
+    - port: 6379
+      targetPort: redis
+      name: redis
+
+

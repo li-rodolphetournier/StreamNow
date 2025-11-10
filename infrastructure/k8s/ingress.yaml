@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: streamnow-ingress
+  namespace: streamnow
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "2g"
+spec:
+  rules:
+    - host: app.streamnow.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: streamnow-frontend
+                port:
+                  number: 3000
+    - host: api.streamnow.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: streamnow-api
+                port:
+                  number: 4000
+    - host: home.streamnow.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: streamnow-home-server
+                port:
+                  number: 4300
+
+

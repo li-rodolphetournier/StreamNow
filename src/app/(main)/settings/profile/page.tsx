@@ -193,6 +193,20 @@ export default function ProfileSettingsPage() {
         <section className="rounded-lg border bg-card p-6 shadow-sm space-y-6">
           <div className="grid gap-4">
             <div className="flex flex-col gap-2">
+              <Label htmlFor="email">Adresse e-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                value={profile?.email ?? user.email}
+                disabled
+                className="cursor-not-allowed opacity-80"
+              />
+              <span className="text-xs text-muted-foreground">
+                Cette adresse est utilisée pour l&apos;authentification et les notifications.
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2">
               <Label htmlFor="nickname">Pseudo</Label>
               <Input
                 id="nickname"

@@ -1,5 +1,6 @@
 import { GraphQLError } from "graphql";
 import { Arg, Authorized, Ctx, ID, Mutation, Query, Resolver } from "type-graphql";
+import { In } from "typeorm";
 import { AppDataSource } from "../config/data-source";
 import {
   Video,
@@ -16,6 +17,7 @@ import { UpdateVideoStatusInput } from "../inputs/UpdateVideoStatusInput";
 import { UpdateVideoVisibilityInput } from "../inputs/UpdateVideoVisibilityInput";
 import { ShareRecipientInput } from "../inputs/ShareRecipientInput";
 import { TmdbService } from "../services/tmdb.service";
+import { algoliaService } from "../services/algolia.service";
 import type { GraphQLContext } from "../types/context";
 import { generateSlug } from "../utils/slug";
 import { CreateLocalVideoInput } from "../inputs/CreateLocalVideoInput";
@@ -309,10 +311,13 @@ export class VideoResolver {
 
     logger.info({ userId: ctx.userId, videoId: saved.id }, "video_imported_tmdb");
 
-    return videoRepo.findOneOrFail({
+    const fullVideo = await videoRepo.findOneOrFail({
       where: { id: saved.id },
       relations: { owner: true },
     });
+
+    await algoliaService.syncVideo(fullVideo);
+    return fullVideo;
   }
 
   @Mutation(() => Video)
@@ -399,10 +404,13 @@ export class VideoResolver {
 
     logger.info({ userId: ctx.userId, videoId: saved.id }, "video_created_local");
 
-    return videoRepo.findOneOrFail({
+    const fullVideo = await videoRepo.findOneOrFail({
       where: { id: saved.id },
       relations: { owner: true },
     });
+
+    await algoliaService.syncVideo(fullVideo);
+    return fullVideo;
   }
 
   @Mutation(() => Video)
@@ -444,10 +452,13 @@ export class VideoResolver {
 
     logger.info({ userId, videoId: video.id, status: input.status }, "video_status_updated");
 
-    return repo.findOneOrFail({
+    const result = await repo.findOneOrFail({
       where: { id: video.id },
       relations: { owner: true },
     });
+
+    await algoliaService.syncVideo(result);
+    return result;
   }
 
   @Mutation(() => Video)
@@ -559,7 +570,71 @@ export class VideoResolver {
       "video_visibility_updated"
     );
 
+    await algoliaService.syncVideo(updated);
     return updated;
+  }
+
+  @Query(() => [Video])
+  async searchLibraryVideos(
+    @Arg("query") query: string,
+    @Ctx() ctx: GraphQLContext
+  ): Promise<Video[]> {
+    const term = query.trim();
+    if (!term) {
+      return [];
+    }
+
+    const videoRepo = AppDataSource.getRepository(Video);
+
+    if (!algoliaService.isEnabled) {
+      const qb = videoRepo
+        .createQueryBuilder("video")
+        .leftJoinAndSelect("video.owner", "owner")
+        .leftJoinAndSelect("video.shares", "shares")
+        .leftJoinAndSelect("shares.recipient", "recipient")
+        .where("LOWER(video.title) LIKE :term", {
+          term: `%${term.toLowerCase()}%`,
+        })
+        .orderBy("video.created_at", "DESC")
+        .take(20);
+
+      const results = await qb.getMany();
+      const filtered: Video[] = [];
+      for (const video of results) {
+        if (await this.canUserViewVideo(video, ctx)) {
+          filtered.push(video);
+        }
+      }
+      return filtered;
+    }
+
+    const hits = await algoliaService.search(term);
+    if (hits.length === 0) {
+      return [];
+    }
+
+    const ids = hits.map((hit) => hit.objectID);
+    const videos = await videoRepo.find({
+      where: { id: In(ids) },
+      relations: {
+        owner: true,
+        shares: { recipient: true, sender: true },
+      },
+    });
+    const videoMap = new Map(videos.map((video) => [video.id, video]));
+    const ordered: Video[] = [];
+
+    for (const hit of hits) {
+      const video = videoMap.get(hit.objectID);
+      if (!video) {
+        continue;
+      }
+      if (await this.canUserViewVideo(video, ctx)) {
+        ordered.push(video);
+      }
+    }
+
+    return ordered;
   }
 }
 

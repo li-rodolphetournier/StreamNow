@@ -13,7 +13,9 @@ export class UpdateProfileInput {
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
-  @Length(3, 50)
+  @Length(2, 50, {
+    message: "Le pseudo doit contenir entre 2 et 50 caractères.",
+  })
   @Transform(({ value }) =>
     typeof value === "string" && value.trim().length === 0 ? undefined : value.trim()
   )

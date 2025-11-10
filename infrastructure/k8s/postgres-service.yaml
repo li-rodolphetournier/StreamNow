@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamnow-postgres
+  namespace: streamnow
+spec:
+  type: ClusterIP
+  selector:
+    app: streamnow-postgres
+  ports:
+    - port: 5432
+      targetPort: postgres
+      name: postgres
+
+
