@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamnow-redis
+  namespace: streamnow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streamnow-redis
+  template:
+    metadata:
+      labels:
+        app: streamnow-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+
+

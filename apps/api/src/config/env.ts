@@ -31,5 +31,9 @@ export const env = {
   facebookClientSecret: process.env.FACEBOOK_CLIENT_SECRET,
   facebookRedirectUri: process.env.FACEBOOK_REDIRECT_URI,
   serviceToken: required(process.env.SERVICE_TOKEN, "SERVICE_TOKEN"),
+  algoliaAppId: process.env.ALGOLIA_APP_ID,
+  algoliaAdminApiKey: process.env.ALGOLIA_ADMIN_API_KEY,
+  algoliaSearchApiKey: process.env.ALGOLIA_SEARCH_API_KEY,
+  algoliaIndexName: process.env.ALGOLIA_INDEX_NAME ?? "streamnow_videos",
 };
 

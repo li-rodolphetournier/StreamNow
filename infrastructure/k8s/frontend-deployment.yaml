@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamnow-frontend
+  namespace: streamnow
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: streamnow-frontend
+  template:
+    metadata:
+      labels:
+        app: streamnow-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/example/streamnow-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NODE_ENV
+            - name: NEXT_PUBLIC_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NEXT_PUBLIC_API_URL
+            - name: NEXT_PUBLIC_HOME_SERVER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NEXT_PUBLIC_HOME_SERVER_URL
+            - name: NEXT_PUBLIC_HOME_SERVER_OWNER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NEXT_PUBLIC_HOME_SERVER_OWNER_ID
+            - name: NEXT_PUBLIC_TMDB_API_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NEXT_PUBLIC_TMDB_API_KEY
+            - name: NEXT_PUBLIC_ALGOLIA_APP_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NEXT_PUBLIC_ALGOLIA_APP_ID
+            - name: NEXT_PUBLIC_ALGOLIA_SEARCH_API_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NEXT_PUBLIC_ALGOLIA_SEARCH_API_KEY
+            - name: NEXT_PUBLIC_ALGOLIA_INDEX_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: streamnow-config
+                  key: NEXT_PUBLIC_ALGOLIA_INDEX_NAME
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "600m"
+              memory: "512Mi"
+
+

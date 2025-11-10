@@ -24,6 +24,9 @@ NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_api_key_here
 NEXT_PUBLIC_API_URL=http://localhost:4000/graphql
 NEXT_PUBLIC_HOME_SERVER_URL=http://localhost:8081
 NEXT_PUBLIC_HOME_SERVER_OWNER_ID=00000000-0000-0000-0000-000000000000
+NEXT_PUBLIC_ALGOLIA_APP_ID= # optionnel si vous consommez Algolia directement côté client
+NEXT_PUBLIC_ALGOLIA_SEARCH_API_KEY=
+NEXT_PUBLIC_ALGOLIA_INDEX_NAME=streamnow_videos
 # Variables désormais optionnelles (plus nécessaires une fois l'auth en place)
 # NEXT_PUBLIC_DEV_USER_ID=editor-demo
 # NEXT_PUBLIC_DEV_USER_ROLE=editor
@@ -48,9 +51,15 @@ REFRESH_TOKEN_SECRET=change-me-too
 ACCESS_TOKEN_TTL=15m
 REFRESH_TOKEN_TTL=30d
 SERVICE_TOKEN=change-me-service-token
+ALGOLIA_APP_ID=
+ALGOLIA_ADMIN_API_KEY=
+ALGOLIA_SEARCH_API_KEY=
+ALGOLIA_INDEX_NAME=streamnow_videos
 ```
 
 > `SERVICE_TOKEN` autorise les appels du serveur StreamNow Home. Générer une valeur forte (ex : `openssl rand -hex 32` ou `powershell -Command "[guid]::NewGuid()"`).
+
+> Les variables `ALGOLIA_*` activent l'indexation et la recherche dans Algolia. Sans elles, la recherche backend retombera sur un filtrage SQL basique (moins performant).
 
 ### Providers OAuth
 

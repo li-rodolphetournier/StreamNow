@@ -34,6 +34,29 @@ docker compose -f docker-compose.dev.yml build --no-cache home-server
 docker compose -f docker-compose.dev.yml up -d home-server nginx
 ```
 
+### Kubernetes (manifeste de base)
+```bash
+# Appliquer les manifestes (namespace + config + workloads)
+kubectl apply -f infrastructure/k8s/namespace.yaml
+kubectl apply -f infrastructure/k8s/configmap-app.yaml
+kubectl apply -f infrastructure/k8s/secret-app.yaml   # ou kubectl create secret ...
+kubectl apply -f infrastructure/k8s/postgres-statefulset.yaml
+kubectl apply -f infrastructure/k8s/postgres-service.yaml
+kubectl apply -f infrastructure/k8s/redis-deployment.yaml
+kubectl apply -f infrastructure/k8s/redis-service.yaml
+kubectl apply -f infrastructure/k8s/api-deployment.yaml
+kubectl apply -f infrastructure/k8s/api-service.yaml
+kubectl apply -f infrastructure/k8s/frontend-deployment.yaml
+kubectl apply -f infrastructure/k8s/frontend-service.yaml
+kubectl apply -f infrastructure/k8s/home-server-pvc.yaml
+kubectl apply -f infrastructure/k8s/home-server-deployment.yaml
+kubectl apply -f infrastructure/k8s/home-server-service.yaml
+kubectl apply -f infrastructure/k8s/ingress.yaml
+
+# Nettoyer l'environnement
+kubectl delete namespace streamnow
+```
+
 ---
 
 ## Migrations Base de Données (apps/api)

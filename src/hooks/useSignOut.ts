@@ -10,6 +10,7 @@ export function useSignOut() {
     onSuccess: () => {
       clearAccessToken();
       queryClient.setQueryData(["currentUser"], null);
+      queryClient.removeQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["customVideos"] });
     },
     onSettled: () => {
