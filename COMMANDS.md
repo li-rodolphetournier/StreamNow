@@ -34,6 +34,12 @@ docker compose -f docker-compose.dev.yml build --no-cache home-server
 docker compose -f docker-compose.dev.yml up -d home-server nginx
 ```
 
+### Application Desktop (Electron)
+```bash
+npm run dev --workspace apps/desktop   # mode développement (fenêtre Electron + home-server)
+npm run dist --workspace apps/desktop  # génère l’installeur Windows (.exe) dans apps/desktop/release/
+```
+
 ### Kubernetes (manifeste de base)
 ```bash
 # Appliquer les manifestes (namespace + config + workloads)

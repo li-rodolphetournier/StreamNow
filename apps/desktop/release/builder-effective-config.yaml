@@ -1,0 +1,21 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.streamnow.home
+productName: StreamNow Home
+files:
+  - filter:
+      - dist/**/*
+extraResources:
+  - from: ../home-server/dist
+    to: home-server
+asar: true
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+electronVersion: 28.3.3
