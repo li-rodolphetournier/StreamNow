@@ -1,11 +1,19 @@
 export type HomeMediaNodeKind = "directory" | "file";
 
+export type HomeLibraryMediaType = string;
+
 export type HomeMediaFileType =
   | "video"
   | "audio"
   | "image"
   | "subtitle"
   | "other";
+
+export interface HomeMediaTypeDefinition {
+  id: HomeLibraryMediaType;
+  label: string;
+  icon?: string;
+}
 
 export interface HomeMediaNode {
   id: string;
@@ -14,6 +22,8 @@ export interface HomeMediaNode {
   kind: HomeMediaNodeKind;
   extension?: string | null;
   mediaType?: HomeMediaFileType;
+  customMediaType?: HomeLibraryMediaType | null;
+  inheritedMediaType?: HomeLibraryMediaType | null;
   size?: number;
   modifiedAt?: string;
   children?: HomeMediaNode[];
@@ -30,5 +40,6 @@ export interface HomeMediaLibrary {
   totalSize: number;
   access: HomeMediaAccessLevel;
   allowedPaths: string[];
+  availableMediaTypes: HomeMediaTypeDefinition[];
 }
 

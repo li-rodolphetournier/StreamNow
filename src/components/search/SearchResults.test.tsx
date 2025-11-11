@@ -1,12 +1,26 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { render, screen } from "@testing-library/react";
-import type { ComponentType } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ComponentType, ReactElement } from "react";
 import { SearchResults } from "./SearchResults";
 import { useSearchVideos, type SearchOptions } from "@/hooks/useSearch";
+import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import type { Video } from "@/types/video";
+
+const renderWithQueryClient = (ui: ReactElement) => {
+  const queryClient = new QueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+};
 
 jest.mock("@/hooks/useSearch", () => ({
   useSearchVideos: jest.fn(),
+}));
+
+const mockUseLibrarySearch = jest.fn();
+jest.mock("@/hooks/useLibrarySearch", () => ({
+  useLibrarySearch: (...args: unknown[]) => mockUseLibrarySearch(...args),
 }));
 
 jest.mock("@/components/video/VideoGrid", () => {
@@ -58,6 +72,11 @@ const createVideo = (overrides: Partial<Video> = {}): Video => ({
 describe("SearchResults", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseLibrarySearch.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("renders loading skeleton when fetching results", () => {
@@ -67,7 +86,7 @@ describe("SearchResults", () => {
       isLoading: true,
     });
 
-    render(<SearchResults query="matrix" />);
+    renderWithQueryClient(<SearchResults query="matrix" />);
 
     expect(screen.getByTestId("carousel-skeleton")).toBeInTheDocument();
   });
@@ -79,9 +98,9 @@ describe("SearchResults", () => {
       error: new Error("Network error"),
     });
 
-    render(<SearchResults query="matrix" />);
+    renderWithQueryClient(<SearchResults query="matrix" />);
 
-    expect(screen.getByText(/une erreur est survenue/i)).toBeInTheDocument();
+    expect(screen.getByText(/Échec de la recherche TMDB/i)).toBeInTheDocument();
   });
 
   it("renders an empty state when there are no videos", () => {
@@ -91,11 +110,11 @@ describe("SearchResults", () => {
       error: null,
     });
 
-    render(<SearchResults query="unknown" />);
+    renderWithQueryClient(<SearchResults query="unknown" />);
 
-    expect(screen.getByText(/aucun résultat/i)).toBeInTheDocument();
+    expect(screen.getByText(/Aucun résultat/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/aucune vidéo trouvée pour "unknown"/i)
+      screen.getByText(/Aucune vidéo trouvée pour "unknown"/i)
     ).toBeInTheDocument();
   });
 
@@ -115,7 +134,7 @@ describe("SearchResults", () => {
       error: null,
     });
 
-    render(
+    renderWithQueryClient(
       <SearchResults
         query="matrix"
         options={options}
@@ -124,7 +143,7 @@ describe("SearchResults", () => {
     );
 
     expect(
-      screen.getByRole("heading", { level: 2, name: /résultats pour "matrix"/i })
+      screen.getByRole("heading", { level: 2, name: /Résultats TMDB pour "matrix"/i })
     ).toBeInTheDocument();
     const metadataContainer = screen
       .getByText(/Type : Films/i)

@@ -129,6 +129,33 @@ npm run api:dev
 - Adminer : [http://localhost:8080](http://localhost:8080) (serveur par défaut `postgres`, user `postgres`, password `postgres`)
 - StreamNow Home (reverse proxy Nginx) : [http://localhost:8081](http://localhost:8081)
 
+> 💡 Le Home Server conserve les associations de type (film, série, etc.) à côté des fichiers locaux.
+> Les définitions sont stockées dans `.media-type-definitions.json` dans `HOME_SERVER_MEDIA_ROOT`.
+> Vous pouvez ajouter un nouveau type directement depuis la page `/home` avec le bouton « Créer un type de média ».
+
+### Application Desktop (Electron)
+
+1. **Développement**
+
+   ```bash
+   # Lance Electron (fenêtre + home-server local)
+   npm run dev --workspace apps/desktop
+   ```
+
+2. **Générer le setup Windows (.exe)**
+
+   ```bash
+   npm run dist --workspace apps/desktop
+   ```
+
+   - Le script exécute `npm run home:build` (build Fastify), compile l’app desktop, puis lance Electron Builder.
+   - L’installeur est produit dans `apps/desktop/release/StreamNow Home Setup 0.1.0.exe`.
+   - Personnaliser l’icône : placez `apps/desktop/build/icon.ico` avant le packaging.
+
+3. **Installer & exécuter**
+   - Distribuez le `.exe` généré.
+   - L’application installe le Home Server dans le répertoire utilisateur (`AppData/Roaming/StreamNow Home/home_media`) et le lance automatiquement.
+
 5. **Appliquer les migrations TypeORM (après démarrage de Postgres)**
 
 ```bash

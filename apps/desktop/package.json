@@ -1,0 +1,30 @@
+{
+  "name": "streamnow-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StreamNow Home desktop application",
+  "author": "StreamNow",
+  "main": "dist/main/index.js",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "dev": "npm run build && cross-env NODE_ENV=development electron ./dist/main/index.js",
+    "type-check": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-static.js",
+    "start": "electron ./dist/main/index.js",
+    "dist": "npm --prefix ../.. run home:build && npm run build && node scripts/prepare-release.js && electron-builder --config electron-builder.yml --win"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "cross-env": "^7.0.3",
+    "electron": "28.3.3",
+    "electron-builder": "^24.13.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
+

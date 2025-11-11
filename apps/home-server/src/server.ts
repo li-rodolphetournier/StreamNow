@@ -9,7 +9,15 @@ import { pipeline } from "stream/promises";
 import { Writable } from "stream";
 import { env } from "./env";
 import { scanMediaLibrary } from "./mediaScanner";
+import { sanitizeRelativePath } from "./utils";
 import type { MediaLibraryPayload, MediaNode } from "./mediaScanner";
+import {
+  addMediaTypeDefinition,
+  getMediaTypeDefinitions,
+  removeMediaTypeDefinition,
+  setMediaTypeForPath,
+  type HomeLibraryMediaType,
+} from "./mediaTypes";
 import {
   abortUploadSession,
   cleanupStaleUploadSessions,
@@ -29,29 +37,26 @@ interface UploadError {
   reason: string;
 }
 
-const sanitizeRelativePath = (rawValue: string | undefined | null): string | null => {
-  if (!rawValue) {
+const sanitizeDirectoryName = (rawValue: string | undefined | null): string | null => {
+  if (typeof rawValue !== "string") {
     return null;
   }
 
   const trimmed = rawValue.trim();
+
   if (!trimmed) {
     return null;
   }
 
-  const normalized = path.normalize(trimmed).replace(/\\/g, "/");
-
-  if (
-    normalized === "." ||
-    normalized.startsWith("/") ||
-    normalized.startsWith("\\") ||
-    path.isAbsolute(normalized) ||
-    normalized.split("/").some((segment) => segment === ".." || segment === "")
-  ) {
+  if (/[\\/]/.test(trimmed)) {
     return null;
   }
 
-  return normalized;
+  if (trimmed === "." || trimmed === "..") {
+    return null;
+  }
+
+  return trimmed;
 };
 
 const discardStream = async (stream?: NodeJS.ReadableStream) => {
@@ -87,6 +92,8 @@ const extractUserId = (request: FastifyRequest): string | null => {
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
 };
+
+const IGNORED_NAMES = new Set([".DS_Store", "Thumbs.db"]);
 
 interface AggregateStats {
   files: number;
@@ -350,6 +357,7 @@ export async function createServer(): Promise<FastifyInstance> {
           totalSize: 0,
           access: "shared" as const,
           allowedPaths: [] as string[],
+          availableMediaTypes: payload.availableMediaTypes,
         };
       }
 
@@ -364,6 +372,7 @@ export async function createServer(): Promise<FastifyInstance> {
         totalSize: filtered.stats.totalSize,
         access: "shared" as const,
         allowedPaths: shares.map((share) => share.path),
+        availableMediaTypes: payload.availableMediaTypes,
       };
     } catch (error) {
       app.log.error({ err: error }, "Failed to scan media library");
@@ -528,6 +537,468 @@ export async function createServer(): Promise<FastifyInstance> {
     }
   });
 
+  app.post("/api/v1/media/directory", async (request, reply) => {
+    const userId = extractUserId(request);
+
+    if (!userId) {
+      reply.code(401);
+      return {
+        status: "error",
+        message: "Authentification requise.",
+      };
+    }
+
+    if (userId !== env.HOME_SERVER_OWNER_ID) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Action réservée au propriétaire du serveur.",
+      };
+    }
+
+    const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
+    await fs.mkdir(mediaRoot, { recursive: true });
+
+    const body = request.body as Partial<{
+      parentPath: unknown;
+      name: unknown;
+      ensureAvailable: unknown;
+    }>;
+
+    const parentPathRaw =
+      typeof body?.parentPath === "string" && body.parentPath.trim().length > 0
+        ? body.parentPath
+        : "";
+    const sanitizedParent =
+      parentPathRaw.length > 0 ? sanitizeRelativePath(parentPathRaw) : "";
+
+    if (sanitizedParent === null) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Chemin parent invalide.",
+      };
+    }
+
+    const sanitizedName = sanitizeDirectoryName(
+      typeof body?.name === "string" ? body.name : undefined
+    );
+
+    if (!sanitizedName) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Nom de dossier invalide.",
+      };
+    }
+
+    const parentAbsolute =
+      sanitizedParent && sanitizedParent.length > 0
+        ? path.join(mediaRoot, sanitizedParent)
+        : mediaRoot;
+
+    if (!parentAbsolute.startsWith(mediaRoot)) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Chemin parent en dehors du dossier média.",
+      };
+    }
+
+    await fs.mkdir(parentAbsolute, { recursive: true });
+
+    const ensureAvailable = body?.ensureAvailable !== false;
+
+    const buildRelativePath = (name: string): string | null => {
+      const candidate = sanitizedParent && sanitizedParent.length > 0 ? `${sanitizedParent}/${name}` : name;
+      return sanitizeRelativePath(candidate);
+    };
+
+    const baseRelativePath = buildRelativePath(sanitizedName);
+
+    if (!baseRelativePath) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Chemin de dossier invalide.",
+      };
+    }
+
+    let finalName = sanitizedName;
+    let finalRelativePath = baseRelativePath;
+
+    const ensureUniquePath = async () => {
+      if (!ensureAvailable) {
+        return;
+      }
+
+      let suffix = 1;
+      while (true) {
+        const absoluteCandidate = path.join(mediaRoot, finalRelativePath);
+        try {
+          const stats = await fs.stat(absoluteCandidate);
+          if (stats.isDirectory() || stats.isFile()) {
+            finalName = `${sanitizedName}-${suffix}`;
+            const nextRelativePath = buildRelativePath(finalName);
+            if (!nextRelativePath) {
+              throw new Error("Échec de la génération d'un nom de dossier disponible.");
+            }
+            finalRelativePath = nextRelativePath;
+            suffix += 1;
+            continue;
+          }
+          return;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
+            return;
+          }
+          throw error;
+        }
+      }
+    };
+
+    try {
+      await ensureUniquePath();
+
+      const absoluteTarget = path.join(mediaRoot, finalRelativePath);
+
+      if (!absoluteTarget.startsWith(mediaRoot)) {
+        reply.code(400);
+        return {
+          status: "error",
+          message: "Chemin de dossier en dehors du dossier média.",
+        };
+      }
+
+      try {
+        await fs.mkdir(absoluteTarget, { recursive: false });
+      } catch (mkdirError) {
+        if ((mkdirError as NodeJS.ErrnoException)?.code === "EEXIST") {
+          reply.code(409);
+          return {
+            status: "error",
+            message: "Un dossier portant ce nom existe déjà.",
+          };
+        }
+        throw mkdirError;
+      }
+
+      reply.code(201);
+      return {
+        status: "ok",
+        name: finalName,
+        relativePath: finalRelativePath,
+      };
+    } catch (error) {
+      app.log.error({ err: error, parent: sanitizedParent, name: sanitizedName }, "Failed to create directory");
+      reply.code(500);
+      return {
+        status: "error",
+        message: "Impossible de créer le dossier demandé.",
+      };
+    }
+  });
+
+  app.post("/api/v1/media/type-definition", async (request, reply) => {
+    const userId = extractUserId(request);
+
+    if (!userId) {
+      reply.code(401);
+      return {
+        status: "error",
+        message: "Authentification requise.",
+      };
+    }
+
+    if (userId !== env.HOME_SERVER_OWNER_ID) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Action réservée au propriétaire du serveur.",
+      };
+    }
+
+    const body = request.body as Partial<{
+      id?: unknown;
+      label?: unknown;
+      icon?: unknown;
+    }>;
+
+    const label =
+      typeof body?.label === "string" && body.label.trim().length > 0
+        ? body.label.trim()
+        : null;
+
+    if (!label) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Le libellé du type de média est requis.",
+      };
+    }
+
+    const icon =
+      typeof body?.icon === "string" && body.icon.trim().length > 0
+        ? body.icon.trim()
+        : undefined;
+
+    const identifier =
+      typeof body?.id === "string" && body.id.trim().length > 0
+        ? body.id.trim()
+        : undefined;
+
+    try {
+      const definition = await addMediaTypeDefinition({
+        id: identifier,
+        label,
+        icon,
+      });
+      const definitions = await getMediaTypeDefinitions();
+
+      reply.code(201).send({
+        status: "ok",
+        definition,
+        definitions,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        reply.code(400);
+        return {
+          status: "error",
+          message: error.message,
+        };
+      }
+
+      app.log.error({ err: error }, "Failed to create media type definition");
+      reply.code(500);
+      return {
+        status: "error",
+        message: "Impossible de créer le type de média.",
+      };
+    }
+  });
+
+  app.delete("/api/v1/media/type-definition/:id", async (request, reply) => {
+    const userId = extractUserId(request);
+
+    if (!userId) {
+      reply.code(401);
+      return {
+        status: "error",
+        message: "Authentification requise.",
+      };
+    }
+
+    if (userId !== env.HOME_SERVER_OWNER_ID) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Action réservée au propriétaire du serveur.",
+      };
+    }
+
+    const rawId = request.params as { id?: string };
+    const identifier = typeof rawId?.id === "string" ? rawId.id.trim() : "";
+
+    if (!identifier) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Identifiant de type de média manquant.",
+      };
+    }
+
+    try {
+      const definitions = await removeMediaTypeDefinition(identifier);
+      reply.code(200).send({
+        status: "ok",
+        definitions,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        const message = error.message.includes("système")
+          ? error.message
+          : "Impossible de supprimer ce type de média.";
+
+        reply.code(error.message.includes("système") ? 400 : 404);
+        return {
+          status: "error",
+          message,
+        };
+      }
+
+      app.log.error({ err: error, identifier }, "Failed to delete media type definition");
+      reply.code(500);
+      return {
+        status: "error",
+        message: "Erreur inattendue lors de la suppression du type de média.",
+      };
+    }
+  });
+
+  app.post("/api/v1/media/type", async (request, reply) => {
+    const userId = extractUserId(request);
+
+    if (!userId) {
+      reply.code(401);
+      return {
+        status: "error",
+        message: "Authentification requise.",
+      };
+    }
+
+    if (userId !== env.HOME_SERVER_OWNER_ID) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Action réservée au propriétaire du serveur.",
+      };
+    }
+
+    const body = request.body as Partial<{
+      path: unknown;
+      mediaType: unknown;
+      applyToChildren?: unknown;
+    }>;
+
+    const rawPath =
+      typeof body?.path === "string" && body.path.trim().length > 0
+        ? body.path
+        : "";
+    const sanitizedPath =
+      rawPath.length > 0 ? sanitizeRelativePath(rawPath) : "";
+
+    if (sanitizedPath === null) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Chemin invalide.",
+      };
+    }
+
+    const rawMediaType =
+      typeof body?.mediaType === "string" ? body.mediaType.trim() : undefined;
+    const definitions = await getMediaTypeDefinitions();
+    const validTypeIds = new Set(definitions.map((definition) => definition.id));
+
+    let mediaType: HomeLibraryMediaType | null;
+    if (rawMediaType === undefined || rawMediaType === null || rawMediaType === "") {
+      mediaType = null;
+    } else if (validTypeIds.has(rawMediaType)) {
+      mediaType = rawMediaType;
+    } else {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Type de média non autorisé.",
+      };
+    }
+
+    const applyToChildrenRaw =
+      typeof body?.applyToChildren === "boolean" ? body.applyToChildren : undefined;
+
+    const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
+    const targetRelative = sanitizedPath ?? "";
+    const targetAbsolute =
+      targetRelative.length > 0 ? path.join(mediaRoot, targetRelative) : mediaRoot;
+
+    if (!targetAbsolute.startsWith(mediaRoot)) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Chemin en dehors du dossier média.",
+      };
+    }
+
+    try {
+      const stats = await fs.stat(targetAbsolute);
+
+      if (!stats.isDirectory() && applyToChildrenRaw === true) {
+        reply.code(400);
+        return {
+          status: "error",
+          message: "Le mode récursif est uniquement disponible pour les dossiers.",
+        };
+      }
+
+      const applyToChildren =
+        stats.isDirectory() ? applyToChildrenRaw ?? true : false;
+
+      const updates: Array<{ relativePath: string; mediaType: string | null }> = [];
+
+      const schedule = (relativePath: string, value: string | null) => {
+        if (relativePath.length === 0) {
+          return;
+        }
+        updates.push({ relativePath, mediaType: value });
+      };
+
+      if (stats.isDirectory() && applyToChildren) {
+        const traverse = async (absoluteDir: string, relativeDir: string) => {
+          const dirents = await fs.readdir(absoluteDir, { withFileTypes: true });
+
+          for (const dirent of dirents) {
+            if (dirent.name.startsWith(".") || IGNORED_NAMES.has(dirent.name)) {
+              continue;
+            }
+
+            const nextRelative = relativeDir
+              ? `${relativeDir}/${dirent.name}`
+              : dirent.name;
+            const normalized = sanitizeRelativePath(nextRelative);
+            if (!normalized) {
+              continue;
+            }
+
+            const nextAbsolute = path.join(absoluteDir, dirent.name);
+            schedule(normalized, mediaType);
+
+            if (dirent.isDirectory()) {
+              await traverse(nextAbsolute, normalized);
+            }
+          }
+        };
+
+        if (targetRelative.length > 0) {
+          schedule(targetRelative, mediaType);
+          await traverse(targetAbsolute, targetRelative);
+        } else {
+          await traverse(targetAbsolute, "");
+        }
+      } else {
+        if (targetRelative.length === 0) {
+          reply.code(400);
+          return {
+            status: "error",
+            message: "Impossible de modifier le type du dossier racine.",
+          };
+        }
+
+        schedule(targetRelative, mediaType);
+      }
+
+      for (const entry of updates) {
+        await setMediaTypeForPath(entry.relativePath, entry.mediaType);
+      }
+
+      reply.code(200);
+      return {
+        status: "ok",
+        updated: updates.length,
+      };
+    } catch (error) {
+      app.log.error(
+        { err: error, path: sanitizedPath ?? "", mediaType },
+        "Failed to set media type"
+      );
+      reply.code(500);
+      return {
+        status: "error",
+        message: "Impossible de définir le type de média.",
+      };
+    }
+  });
+
   app.post("/api/v1/media/upload", async (request, reply) => {
     const userId = extractUserId(request);
 
@@ -671,19 +1142,24 @@ export async function createServer(): Promise<FastifyInstance> {
     const explicitRelativePath =
       typeof body?.relativePath === "string" ? body.relativePath : undefined;
 
-    const totalSize =
-      typeof body?.totalSize === "number" && Number.isFinite(body.totalSize)
-        ? body.totalSize
-        : undefined;
+    const parseNumeric = (value: unknown): number | undefined => {
+      if (typeof value === "number") {
+        return Number.isFinite(value) ? value : undefined;
+      }
+      if (typeof value === "string" && value.trim().length > 0) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
+    };
 
-    const chunkSize =
-      typeof body?.chunkSize === "number" && Number.isFinite(body.chunkSize)
-        ? body.chunkSize
-        : undefined;
+    const totalSize = parseNumeric(body?.totalSize);
+    const chunkSize = parseNumeric(body?.chunkSize);
 
+    const totalChunksRaw = parseNumeric(body?.totalChunks);
     const totalChunks =
-      typeof body?.totalChunks === "number" && Number.isFinite(body.totalChunks)
-        ? Math.trunc(body.totalChunks)
+      typeof totalChunksRaw === "number" && totalChunksRaw > 0
+        ? Math.trunc(totalChunksRaw)
         : undefined;
 
     if (!filename || !totalSize || !chunkSize) {

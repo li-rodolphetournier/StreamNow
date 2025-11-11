@@ -1,6 +1,12 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { env } from "./env";
+import {
+  readMediaTypeOverrides,
+  HomeLibraryMediaType,
+  getMediaTypeDefinitions,
+  MediaTypeDefinition,
+} from "./mediaTypes";
 
 const VIDEO_EXTENSIONS = new Set([
   ".mp4",
@@ -31,6 +37,8 @@ export interface MediaNode {
   mediaType?: MediaFileType;
   size?: number;
   modifiedAt?: string;
+  customMediaType?: HomeLibraryMediaType | null;
+  inheritedMediaType?: HomeLibraryMediaType | null;
   children?: MediaNode[];
 }
 
@@ -82,7 +90,9 @@ const normalizeRelativePath = (relativePath: string): string =>
 
 async function scanEntry(
   absolutePath: string,
-  relativePath: string
+  relativePath: string,
+  overrides: Map<string, HomeLibraryMediaType>,
+  inheritedType: HomeLibraryMediaType | null
 ): Promise<ScanResult> {
   const stats = await fs.stat(absolutePath);
   const normalizedRelativePath = normalizeRelativePath(relativePath);
@@ -91,6 +101,9 @@ async function scanEntry(
     const dirents = await fs.readdir(absolutePath, { withFileTypes: true });
     const children: MediaNode[] = [];
     const aggregateStats = initialStats();
+
+    const overrideForDirectory = overrides.get(normalizedRelativePath || "");
+    const effectiveType = overrideForDirectory ?? inheritedType;
 
     for (const dirent of dirents) {
       if (IGNORED_NAMES.has(dirent.name) || dirent.name.startsWith(".")) {
@@ -101,7 +114,9 @@ async function scanEntry(
       const childAbsolutePath = path.join(absolutePath, dirent.name);
       const childResult = await scanEntry(
         childAbsolutePath,
-        childRelativePath
+        childRelativePath,
+        overrides,
+        effectiveType
       );
 
       children.push(childResult.node);
@@ -121,6 +136,8 @@ async function scanEntry(
         relativePath: normalizedRelativePath,
         kind: "directory",
         children,
+        customMediaType: overrideForDirectory ?? null,
+        inheritedMediaType: inheritedType,
       },
       stats: {
         ...aggregateStats,
@@ -131,6 +148,7 @@ async function scanEntry(
 
   const extension = path.extname(absolutePath).toLowerCase() || null;
   const mediaType = classifyMediaType(extension);
+  const override = overrides.get(normalizedRelativePath);
 
   return {
     node: {
@@ -140,6 +158,8 @@ async function scanEntry(
       kind: "file",
       extension,
       mediaType,
+      customMediaType: override ?? null,
+      inheritedMediaType: inheritedType,
       size: stats.size,
       modifiedAt: stats.mtime.toISOString(),
     },
@@ -159,6 +179,7 @@ export interface MediaLibraryPayload {
   totalVideos: number;
   totalDirectories: number;
   totalSize: number;
+  availableMediaTypes: MediaTypeDefinition[];
 }
 
 export async function scanMediaLibrary(): Promise<MediaLibraryPayload> {
@@ -174,7 +195,19 @@ export async function scanMediaLibrary(): Promise<MediaLibraryPayload> {
     );
   }
 
-  const { node, stats } = await scanEntry(absoluteRootPath, "");
+  const overrides = await readMediaTypeOverrides();
+  const overrideMap = new Map<string, HomeLibraryMediaType>(
+    Object.entries(overrides)
+  );
+
+  const { node, stats } = await scanEntry(
+    absoluteRootPath,
+    "",
+    overrideMap,
+    null
+  );
+
+  const definitions = await getMediaTypeDefinitions();
 
   return {
     generatedAt: new Date().toISOString(),
@@ -183,6 +216,7 @@ export async function scanMediaLibrary(): Promise<MediaLibraryPayload> {
     totalVideos: stats.videos,
     totalDirectories: stats.directories,
     totalSize: stats.totalSize,
+    availableMediaTypes: definitions,
   };
 }
 
