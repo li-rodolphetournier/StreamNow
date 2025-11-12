@@ -38,10 +38,11 @@ jobs:
         env:
           NEXT_PUBLIC_TMDB_API_KEY: ${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }}
 
-
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
       - name: E2E tests
         run: npm run test:e2e -- --reporter=github
+        env:
+          NEXT_PUBLIC_TMDB_API_KEY: ${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }}
 
