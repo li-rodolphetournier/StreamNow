@@ -13,6 +13,9 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
 // TODO: Ajouter votre clé API TMDB dans les variables d'environnement
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || "";
+const USE_TMDB_MOCKS =
+  process.env.NEXT_PUBLIC_USE_MOCK_TMDB === "true" ||
+  process.env.TMDB_USE_MOCKS === "true";
 
 export type SearchSortKey = "popularity" | "vote_average" | "release_date";
 
@@ -22,7 +25,7 @@ export type SearchOptions = {
   sortBy?: SearchSortKey;
 };
 
-if (!TMDB_API_KEY) {
+if (!TMDB_API_KEY && !USE_TMDB_MOCKS) {
   console.warn(
     "⚠️ NEXT_PUBLIC_TMDB_API_KEY n'est pas définie. Les appels API TMDB échoueront."
   );
@@ -35,6 +38,117 @@ const apiClient = axios.create({
     language: "fr-FR",
   },
 });
+
+const MOCK_MOVIE: Video = {
+  id: 100,
+  title: "Mock Movie",
+  overview: "Un film fictif utilisé pour les tests automatisés.",
+  posterPath: "/mock-poster.jpg",
+  backdropPath: "/mock-backdrop.jpg",
+  releaseDate: "2024-01-01",
+  voteAverage: 8.5,
+  voteCount: 1200,
+  genreIds: [28, 12],
+  mediaType: "movie",
+  popularity: 300,
+};
+
+const MOCK_TV_SHOW: Video = {
+  id: 200,
+  title: "Mock Show",
+  overview: "Une série fictive utilisée pour les tests automatisés.",
+  posterPath: "/mock-show-poster.jpg",
+  backdropPath: "/mock-show-backdrop.jpg",
+  releaseDate: "2023-09-15",
+  voteAverage: 7.9,
+  voteCount: 640,
+  genreIds: [18],
+  mediaType: "tv",
+  popularity: 180,
+};
+
+const MOCK_MOVIE_DETAILS: VideoDetails = {
+  ...MOCK_MOVIE,
+  runtime: 122,
+  genres: [
+    { id: 28, name: "Action" },
+    { id: 12, name: "Aventure" },
+  ],
+  productionCompanies: [
+    {
+      id: 1,
+      name: "Mock Studio",
+      logoPath: "/mock-studio-logo.png",
+    },
+  ],
+  cast: [
+    {
+      id: 10,
+      name: "Mock Actor",
+      character: "Héro",
+      profilePath: "/mock-actor.png",
+      order: 0,
+    },
+  ],
+  crew: [
+    {
+      id: 11,
+      name: "Mock Director",
+      job: "Director",
+      department: "Production",
+      profilePath: "/mock-director.png",
+    },
+  ],
+  similar: [],
+  recommendations: [],
+};
+
+const MOCK_TV_DETAILS: VideoDetails = {
+  ...MOCK_TV_SHOW,
+  seasons: 3,
+  episodes: 24,
+  genres: [{ id: 18, name: "Drame" }],
+  productionCompanies: [
+    {
+      id: 2,
+      name: "Mock Network",
+      logoPath: "/mock-network-logo.png",
+    },
+  ],
+  cast: [
+    {
+      id: 20,
+      name: "Mock Actress",
+      character: "Protagoniste",
+      profilePath: "/mock-actress.png",
+      order: 0,
+    },
+  ],
+  crew: [
+    {
+      id: 21,
+      name: "Mock Showrunner",
+      job: "Producer",
+      department: "Production",
+      profilePath: "/mock-showrunner.png",
+    },
+  ],
+  similar: [],
+  recommendations: [],
+};
+
+const MOCK_MOVIE_GENRES: TMDBGenre[] = [
+  { id: 28, name: "Action" },
+  { id: 12, name: "Aventure" },
+];
+
+const MOCK_TV_GENRES: TMDBGenre[] = [{ id: 18, name: "Drame" }];
+
+const MOCK_TRAILER_KEY = "mock-trailer-key";
+
+function buildMockList(videos: Video[]): { videos: Video[]; totalPages: number } {
+  return { videos, totalPages: 1 };
+}
 
 /**
  * Convertit un film TMDB en Video
@@ -93,6 +207,9 @@ export function getImageUrl(
 export async function getPopularMovies(
   page: number = 1
 ): Promise<{ videos: Video[]; totalPages: number }> {
+  if (USE_TMDB_MOCKS) {
+    return buildMockList([MOCK_MOVIE]);
+  }
   const response = await apiClient.get<TMDBResponse<TMDBMovie>>(
     "/movie/popular",
     { params: { page } }
@@ -109,6 +226,9 @@ export async function getPopularMovies(
 export async function getPopularTVShows(
   page: number = 1
 ): Promise<{ videos: Video[]; totalPages: number }> {
+  if (USE_TMDB_MOCKS) {
+    return buildMockList([MOCK_TV_SHOW]);
+  }
   const response = await apiClient.get<TMDBResponse<TMDBTVShow>>(
     "/tv/popular",
     { params: { page } }
@@ -125,6 +245,9 @@ export async function getPopularTVShows(
 export async function getTrendingMovies(
   page: number = 1
 ): Promise<{ videos: Video[]; totalPages: number }> {
+  if (USE_TMDB_MOCKS) {
+    return buildMockList([MOCK_MOVIE]);
+  }
   const response = await apiClient.get<TMDBResponse<TMDBMovie>>(
     "/trending/movie/day",
     { params: { page } }
@@ -141,6 +264,9 @@ export async function getTrendingMovies(
 export async function getTrendingTVShows(
   page: number = 1
 ): Promise<{ videos: Video[]; totalPages: number }> {
+  if (USE_TMDB_MOCKS) {
+    return buildMockList([MOCK_TV_SHOW]);
+  }
   const response = await apiClient.get<TMDBResponse<TMDBTVShow>>(
     "/trending/tv/day",
     { params: { page } }
@@ -159,6 +285,30 @@ export async function searchVideos(
   page: number = 1,
   options?: SearchOptions
 ): Promise<{ videos: Video[]; totalPages: number }> {
+  if (USE_TMDB_MOCKS) {
+    const catalog = [MOCK_MOVIE, MOCK_TV_SHOW];
+    const results = catalog.filter((item) => {
+      const matchesQuery = item.title.toLowerCase().includes(query.toLowerCase());
+      if (!matchesQuery) {
+        return false;
+      }
+
+      if (options?.mediaType && options.mediaType !== "multi") {
+        return item.mediaType === options.mediaType;
+      }
+
+      if (options?.genre) {
+        return item.genreIds.includes(options.genre);
+      }
+
+      return true;
+    });
+
+    return {
+      videos: results,
+      totalPages: results.length > 0 ? 1 : 0,
+    };
+  }
   const response = await apiClient.get<TMDBResponse<TMDBMovie | TMDBTVShow>>(
     "/search/multi",
     { params: { query, page } }
@@ -205,6 +355,12 @@ export async function getGenres(): Promise<{
   movieGenres: TMDBGenre[];
   tvGenres: TMDBGenre[];
 }> {
+  if (USE_TMDB_MOCKS) {
+    return {
+      movieGenres: MOCK_MOVIE_GENRES,
+      tvGenres: MOCK_TV_GENRES,
+    };
+  }
   const [movies, tv] = await Promise.all([
     apiClient.get<{ genres: TMDBGenre[] }>("/genre/movie/list"),
     apiClient.get<{ genres: TMDBGenre[] }>("/genre/tv/list"),
@@ -220,6 +376,12 @@ export async function getGenres(): Promise<{
  * Récupère les détails d'un film
  */
 export async function getMovieDetails(id: number): Promise<VideoDetails> {
+  if (USE_TMDB_MOCKS) {
+    return {
+      ...MOCK_MOVIE_DETAILS,
+      id,
+    };
+  }
   const response = await apiClient.get<TMDBVideoDetails>(`/movie/${id}`, {
     params: { append_to_response: "credits,similar,recommendations" },
   });
@@ -277,6 +439,12 @@ export async function getMovieDetails(id: number): Promise<VideoDetails> {
  * Récupère les détails d'une série TV
  */
 export async function getTVShowDetails(id: number): Promise<VideoDetails> {
+  if (USE_TMDB_MOCKS) {
+    return {
+      ...MOCK_TV_DETAILS,
+      id,
+    };
+  }
   const response = await apiClient.get<TMDBVideoDetails>(`/tv/${id}`, {
     params: { append_to_response: "credits,similar,recommendations" },
   });
@@ -363,6 +531,9 @@ function sortVideos(videos: Video[], sortBy?: SearchSortKey) {
  * Récupère les vidéos (trailers) d'un film
  */
 export async function getMovieVideos(id: number): Promise<string | null> {
+  if (USE_TMDB_MOCKS) {
+    return MOCK_TRAILER_KEY;
+  }
   try {
     const trailer = await fetchVideos(`/movie/${id}/videos`);
     if (trailer) return trailer;
@@ -378,6 +549,9 @@ export async function getMovieVideos(id: number): Promise<string | null> {
  * Récupère les vidéos (trailers) d'une série TV
  */
 export async function getTVShowVideos(id: number): Promise<string | null> {
+  if (USE_TMDB_MOCKS) {
+    return MOCK_TRAILER_KEY;
+  }
   try {
     const trailer = await fetchVideos(`/tv/${id}/videos`);
     if (trailer) return trailer;
@@ -390,6 +564,9 @@ export async function getTVShowVideos(id: number): Promise<string | null> {
 }
 
 async function fetchVideos(endpoint: string, languageOverride?: string) {
+  if (USE_TMDB_MOCKS) {
+    return MOCK_TRAILER_KEY;
+  }
   const response = await apiClient.get<{
     id: number;
     results: Array<{

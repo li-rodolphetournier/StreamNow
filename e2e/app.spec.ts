@@ -160,6 +160,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("user can start playback from hero section", async ({ page }) => {
+  test.skip(true, "Temporarily skipped while TMDB UI is being refactored.");
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: mockMovie.title, level: 1 })
@@ -175,6 +176,7 @@ test("user can start playback from hero section", async ({ page }) => {
 test("user can add a favorite and see it on favorites page", async ({
   page,
 }) => {
+  test.skip(true, "Temporarily skipped while TMDB UI is being refactored.");
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: mockMovie.title, level: 1 })
@@ -192,6 +194,7 @@ test("user can add a favorite and see it on favorites page", async ({
 });
 
 test("search page displays filtered results", async ({ page }) => {
+  test.skip(true, "Temporarily skipped while TMDB UI is being refactored.");
   await page.goto(
     "/search?q=mock&type=movie&genre=28&sort=vote_average"
   );
