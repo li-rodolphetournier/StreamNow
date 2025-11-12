@@ -5,6 +5,7 @@ import {
   Query,
   Resolver,
   Authorized,
+  ID,
 } from "type-graphql";
 import { Repository } from "typeorm";
 import { hash, verify } from "argon2";
@@ -195,6 +196,16 @@ export class AuthResolver {
     }
 
     return this.userRepository.findOne({ where: { id: ctx.userId } });
+  }
+
+  @Authorized()
+  @Query(() => User, { nullable: true })
+  async userById(@Arg("id", () => ID) id: string): Promise<User | null> {
+    if (!id) {
+      return null;
+    }
+
+    return this.userRepository.findOne({ where: { id } });
   }
 
   @Authorized()

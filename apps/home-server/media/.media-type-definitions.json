@@ -1,0 +1,19 @@
+{
+  "types": [
+    {
+      "id": "movie",
+      "label": "Film",
+      "icon": "noto:clapper-board"
+    },
+    {
+      "id": "tv",
+      "label": "Série",
+      "icon": "noto:television"
+    },
+    {
+      "id": "documentaire",
+      "label": "Documentaire",
+      "icon": "noto:puzzle-piece"
+    }
+  ]
+}
