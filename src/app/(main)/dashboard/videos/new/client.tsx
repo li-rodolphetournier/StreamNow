@@ -66,6 +66,13 @@ export function AddVideoClient() {
   const isImportPending = addVideoMutation.status === "pending";
   const isLocalPending = createLocalVideoMutation.status === "pending";
 
+  const tmdbQueryMediaType = useMemo(() => mediaType ?? "MOVIE", [mediaType]);
+  const effectiveSearchTerm = user ? searchTerm : "";
+  const { data: tmdbResults = [], isFetching: isSearching } = useTmdbSearch(
+    effectiveSearchTerm,
+    tmdbQueryMediaType
+  );
+
   if (isAuthLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -78,12 +85,6 @@ export function AddVideoClient() {
   if (!user) {
     return null;
   }
-
-  const tmdbQueryMediaType = useMemo(() => mediaType ?? "MOVIE", [mediaType]);
-  const { data: tmdbResults = [], isFetching: isSearching } = useTmdbSearch(
-    searchTerm,
-    tmdbQueryMediaType
-  );
 
   const handleModeChange = (nextMode: FormMode) => {
     setMode(nextMode);

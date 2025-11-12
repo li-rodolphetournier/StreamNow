@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,22 +18,24 @@ export default function OAuthCallbackPage() {
   const params = useParams<{ provider: string }>();
   const searchParams = useSearchParams();
   const { mutate: oauthSignIn, isPending } = useOAuthSignIn();
-  const [error, setError] = useState<string | null>(null);
+  const providerParam = params.provider?.toLowerCase() ?? "";
+  const mappedProvider = providerParam ? PROVIDER_MAP[providerParam] : undefined;
+  const code = searchParams?.get("code") ?? null;
+  const state = searchParams?.get("state") ?? null;
+  const fallbackRedirect = searchParams?.get("redirect") ?? "/dashboard/videos";
+  const validationError = useMemo(() => {
+    if (!mappedProvider || !code) {
+      return "Paramètres OAuth invalides.";
+    }
+    if (!validateState(state)) {
+      return "La vérification de sécurité a échoué. Veuillez réessayer.";
+    }
+    return null;
+  }, [code, mappedProvider, state]);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   useEffect(() => {
-    const providerParam = params.provider?.toLowerCase();
-    const mappedProvider = providerParam ? PROVIDER_MAP[providerParam] : undefined;
-    const code = searchParams?.get("code");
-    const state = searchParams?.get("state");
-    const fallbackRedirect = searchParams?.get("redirect") ?? "/dashboard/videos";
-
-    if (!mappedProvider || !code) {
-      setError("Paramètres OAuth invalides.");
-      return;
-    }
-
-    if (!validateState(state)) {
-      setError("La vérification de sécurité a échoué. Veuillez réessayer.");
+    if (validationError || !mappedProvider || !code) {
       return;
     }
 
@@ -53,11 +55,21 @@ export default function OAuthCallbackPage() {
           router.replace(redirectTarget);
         },
         onError: (mutationError) => {
-          setError(mutationError.message);
+          setMutationError(mutationError.message);
         },
       }
     );
-  }, [oauthSignIn, params.provider, router, searchParams]);
+  }, [
+    code,
+    fallbackRedirect,
+    mappedProvider,
+    oauthSignIn,
+    providerParam,
+    router,
+    validationError,
+  ]);
+
+  const error = mutationError ?? validationError;
 
   if (isPending && !error) {
     return (

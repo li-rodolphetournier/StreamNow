@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import multipart, { MultipartFile } from "@fastify/multipart";
-import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import fastify, { FastifyInstance, FastifyRequest } from "fastify";
 import { createReadStream, createWriteStream } from "fs";
 import { promises as fs } from "fs";
 import path from "path";
@@ -560,8 +560,6 @@ export async function createServer(): Promise<FastifyInstance> {
         name: "Mes fichiers",
       };
 
-      const personalStats = computeNodeStats(personalNode);
-
       const shares = await getSharesForRecipient(userId);
       const sharedFiltered =
         shares.length > 0 ? filterLibraryForShares(payload, shares) : null;
@@ -569,8 +567,6 @@ export async function createServer(): Promise<FastifyInstance> {
       const sharedChildren = (sharedFiltered?.node.children ?? []).filter(
         (child) => child.relativePath !== personalRelativePath
       );
-
-      const sharedStats = computeChildrenStats(sharedChildren);
 
       const combinedChildren = [personalNode, ...sharedChildren];
       const combinedStats = computeChildrenStats(combinedChildren);

@@ -32,8 +32,6 @@ export function confirmToast(
       }
     };
 
-    let currentToastId: Id;
-
     const handleConfirm = () => {
       finalize(true);
       toast.dismiss(currentToastId);
@@ -44,7 +42,7 @@ export function confirmToast(
       toast.dismiss(currentToastId);
     };
 
-    currentToastId = toast(
+    const currentToastId: Id = toast(
       (toastProps) => (
         <ConfirmationToast
           {...toastProps}

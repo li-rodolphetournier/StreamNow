@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentType, ReactElement } from "react";
 import { SearchResults } from "./SearchResults";
 import { useSearchVideos, type SearchOptions } from "@/hooks/useSearch";
-import { useLibrarySearch } from "@/hooks/useLibrarySearch";
 import type { Video } from "@/types/video";
 
 const renderWithQueryClient = (ui: ReactElement) => {
