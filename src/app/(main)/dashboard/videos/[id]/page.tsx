@@ -154,6 +154,7 @@ export default function DashboardVideoDetailPage() {
     [data?.status]
   );
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!data) {
       return;
@@ -165,6 +166,7 @@ export default function DashboardVideoDetailPage() {
     setVisibilityError(null);
     setVisibilitySuccess(null);
   }, [data]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleStatusChange = async (status: GraphQLVideoStatus) => {
     if (!data) return;

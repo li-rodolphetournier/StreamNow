@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { PropsWithChildren } from "react";
+import type { ComponentPropsWithoutRef, PropsWithChildren } from "react";
 import { HeroSection } from "./HeroSection";
 import type { Video } from "@/types/video";
 
@@ -18,9 +18,14 @@ const mockFavorites = {
   removeFavoriteStatus: "idle" as const,
 };
 
+type MockImageProps = ComponentPropsWithoutRef<"img"> & {
+  priority?: boolean;
+  fill?: boolean;
+};
+
 jest.mock("next/image", () => ({
   __esModule: true,
-  default: ({ alt, priority, fill, ...props }: any) => {
+  default: ({ alt, priority, fill, ...props }: MockImageProps) => {
     void priority;
     void fill;
     return (

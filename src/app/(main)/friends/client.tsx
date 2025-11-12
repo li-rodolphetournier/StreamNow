@@ -16,7 +16,6 @@ import {
   useRespondFriendRequest,
 } from "@/hooks/useFriends";
 import type { GraphQLFriend, GraphQLFriendRequest } from "@/types/graphql";
-import { cn } from "@/lib/utils";
 
 const statusLabel: Record<string, string> = {
   pending: "En attente",

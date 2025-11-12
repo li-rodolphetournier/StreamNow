@@ -26,13 +26,14 @@ const mockRedis = {
     mockStore.delete(key);
   }),
   scanIterator: jest.fn(async function* ({ MATCH }: { MATCH: string }) {
-    const regex = new RegExp(`^${MATCH.replace("*", ".*")}$`);
+    const pattern = MATCH.replace(/\*/g, ".*");
+    const regex = new RegExp(`^${pattern}$`);
     for (const key of mockStore.keys()) {
       if (regex.test(key)) {
         yield key;
       }
     }
-  } as any),
+  }),
 };
 
 jest.mock("../../lib/redis", () => ({

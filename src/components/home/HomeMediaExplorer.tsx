@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element, react-hooks/set-state-in-effect */
 
 import {
   Fragment,
@@ -470,7 +471,6 @@ function MediaNodeRow({
   }
 
   const Icon = node.mediaType === "video" ? Film : HardDrive;
-  const resolvedFileType = resolveMediaType(node);
   return (
     <div
       className={cn(
@@ -874,7 +874,7 @@ function HomeMediaPreviewDialog({
   } else {
     body = (
       <div className="space-y-2 text-sm text-muted-foreground">
-        <p>Aucun aperçu n'est disponible pour ce type de fichier.</p>
+        <p>Aucun aperçu n&rsquo;est disponible pour ce type de fichier.</p>
         <p>
           Vous pouvez cependant{" "}
           <a
@@ -883,7 +883,7 @@ function HomeMediaPreviewDialog({
             rel="noopener noreferrer"
             className="font-medium text-primary underline underline-offset-2"
           >
-            l'ouvrir dans un nouvel onglet
+            l&rsquo;ouvrir dans un nouvel onglet
           </a>{" "}
           pour le consulter.
         </p>
@@ -902,7 +902,7 @@ function HomeMediaPreviewDialog({
         {contentUrl ? (
           <DialogFooter className="flex flex-col items-stretch gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-muted-foreground">
-              L'aperçu est généré depuis votre StreamNow Home Server.
+              L&rsquo;aperçu est généré depuis votre StreamNow Home Server.
             </span>
             <Button asChild variant="outline" size="sm">
               <a href={contentUrl} target="_blank" rel="noopener noreferrer">
@@ -2172,7 +2172,7 @@ export function HomeMediaExplorer({
                   disabled={isCreatingType}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Utilisé dans les scripts et l'API. Laissez vide pour le générer automatiquement.
+                  Utilisé dans les scripts et l&rsquo;API. Laissez vide pour le générer automatiquement.
                 </p>
               </div>
               <div className="space-y-2">
@@ -2331,7 +2331,7 @@ export function HomeMediaExplorer({
                     onClick={() => setNewTypeIcon("")}
                     disabled={isCreatingType || newTypeIcon.length === 0}
                   >
-                    Réinitialiser l'icône
+                    Réinitialiser l&rsquo;icône
                   </Button>
                 </div>
               </div>

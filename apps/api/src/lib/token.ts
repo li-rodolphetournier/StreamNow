@@ -49,7 +49,7 @@ export const generateTokenId = (): string => randomUUID();
 export const verifyAccessToken = (token: string): AccessTokenPayload | null => {
   try {
     return jwt.verify(token, env.jwtSecret) as AccessTokenPayload;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
@@ -59,7 +59,7 @@ export const verifyRefreshToken = (
 ): RefreshTokenPayload | null => {
   try {
     return jwt.verify(token, env.refreshTokenSecret) as RefreshTokenPayload;
-  } catch (error) {
+  } catch {
     return null;
   }
 };

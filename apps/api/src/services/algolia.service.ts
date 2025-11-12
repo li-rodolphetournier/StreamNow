@@ -1,4 +1,7 @@
-const algoliasearch = require("algoliasearch");
+import algoliasearch, {
+  type SearchClient,
+  type SearchIndex,
+} from "algoliasearch";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
 import type { Video } from "../entities/Video";
@@ -23,8 +26,8 @@ interface AlgoliaVideoRecord {
 
 class AlgoliaService {
   private readonly enabled: boolean;
-  private readonly client?: any;
-  private readonly index?: any;
+  private readonly client?: SearchClient;
+  private readonly index?: SearchIndex;
 
   constructor() {
     if (
@@ -136,9 +139,9 @@ class AlgoliaService {
     }
 
     try {
-      const result = (await this.index.search(query, {
+      const result = await this.index.search<AlgoliaVideoRecord>(query, {
         hitsPerPage: 20,
-      })) as { hits: AlgoliaVideoRecord[] };
+      });
       return result.hits ?? [];
     } catch (error) {
       logger.error({ err: error }, "Algolia search error");
