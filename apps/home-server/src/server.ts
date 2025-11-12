@@ -23,6 +23,7 @@ import {
   cleanupStaleUploadSessions,
   createUploadSession,
   finalizeUploadSession,
+  getUploadSession,
   recordChunkForSession,
 } from "./uploadSessions";
 import { getSharesForRecipient, SharePermission } from "./sharePermissions";
@@ -108,6 +109,164 @@ const emptyStats = (): AggregateStats => ({
   directories: 0,
   totalSize: 0,
 });
+
+const USERS_DIRECTORY = "users";
+
+const ownerId = env.HOME_SERVER_OWNER_ID;
+
+const getPersonalRelativePath = (userId: string): string =>
+  `${USERS_DIRECTORY}/${userId}`;
+
+const getPersonalAbsolutePath = (userId: string): string =>
+  path.join(path.resolve(env.HOME_SERVER_MEDIA_ROOT), getPersonalRelativePath(userId));
+
+const resolveManageableRoots = async (userId: string): Promise<string[]> => {
+  if (!userId) {
+    return [];
+  }
+
+  if (userId === ownerId) {
+    return [""];
+  }
+
+  await ensurePersonalRoot(userId);
+  return [getPersonalRelativePath(userId)];
+};
+
+const collectManageableRoots = async (userId: string): Promise<string[]> => {
+  const rawRoots = await resolveManageableRoots(userId);
+
+  if (userId === ownerId) {
+    return rawRoots.length > 0 ? rawRoots : [""];
+  }
+
+  const personalRoot = getPersonalRelativePath(userId);
+  if (rawRoots.includes(personalRoot)) {
+    return rawRoots;
+  }
+
+  const filtered = rawRoots.filter((root) => root.length > 0 && root !== personalRoot);
+  return [...filtered, personalRoot];
+};
+
+const isPathWithinManageableRoots = (
+  relativePath: string,
+  manageableRoots: string[]
+): boolean => {
+  if (!relativePath) {
+    return manageableRoots.some((root) => root.length === 0);
+  }
+
+  return manageableRoots.some((root) => pathStartsWithRoot(relativePath, root));
+};
+
+const normalizeRelativePathForUser = (
+  relativePath: string,
+  manageableRoots: string[]
+): string | null => {
+  const sanitized = sanitizeRelativePath(relativePath);
+  if (!sanitized) {
+    return null;
+  }
+
+  for (const root of manageableRoots) {
+    if (!root || pathStartsWithRoot(sanitized, root)) {
+      return sanitized;
+    }
+  }
+
+  const primaryRoot = manageableRoots.find((root) => root.length > 0);
+  if (!primaryRoot) {
+    return sanitized;
+  }
+
+  return sanitizeRelativePath(`${primaryRoot}/${sanitized}`);
+};
+
+const pathStartsWithRoot = (pathValue: string, root: string): boolean => {
+  if (!root) {
+    return true;
+  }
+  return pathValue === root || pathValue.startsWith(`${root}/`);
+};
+
+const ensurePersonalRoot = async (userId: string): Promise<void> => {
+  if (!userId || userId === ownerId) {
+    return;
+  }
+
+  const personalAbsolute = getPersonalAbsolutePath(userId);
+  await fs.mkdir(personalAbsolute, { recursive: true });
+};
+
+const cloneNode = (node: MediaNode): MediaNode => ({
+  ...node,
+  children: node.children ? node.children.map(cloneNode) : undefined,
+});
+
+const computeNodeStats = (node: MediaNode): AggregateStats => {
+  if (node.kind === "file") {
+    const size = node.size ?? 0;
+    return {
+      files: 1,
+      videos: node.mediaType === "video" ? 1 : 0,
+      directories: 0,
+      totalSize: size,
+    };
+  }
+
+  const aggregated = (node.children ?? []).reduce<AggregateStats>(
+    (accumulator, child) => {
+      const childStats = computeNodeStats(child);
+      accumulator.files += childStats.files;
+      accumulator.videos += childStats.videos;
+      accumulator.directories += childStats.directories;
+      accumulator.totalSize += childStats.totalSize;
+      return accumulator;
+    },
+    emptyStats()
+  );
+
+  return {
+    files: aggregated.files,
+    videos: aggregated.videos,
+    directories: aggregated.directories + 1,
+    totalSize: aggregated.totalSize,
+  };
+};
+
+const computeChildrenStats = (nodes: MediaNode[]): AggregateStats =>
+  nodes.reduce<AggregateStats>((accumulator, child) => {
+    const childStats = computeNodeStats(child);
+    accumulator.files += childStats.files;
+    accumulator.videos += childStats.videos;
+    accumulator.directories += childStats.directories;
+    accumulator.totalSize += childStats.totalSize;
+    return accumulator;
+  }, emptyStats());
+
+const findNodeByPath = (root: MediaNode, targetPath: string): MediaNode | null => {
+  if (!targetPath) {
+    return cloneNode(root);
+  }
+
+  const visit = (node: MediaNode): MediaNode | null => {
+    if (node.relativePath === targetPath) {
+      return cloneNode(node);
+    }
+
+    for (const child of node.children ?? []) {
+      const result = visit(child);
+      if (result) {
+        return result;
+      }
+    }
+
+    return null;
+  };
+
+  return visit(root);
+};
 
 interface ShareLookups {
   directories: string[];
@@ -333,46 +492,67 @@ export async function createServer(): Promise<FastifyInstance> {
 
     try {
       const payload = await scanMediaLibrary();
+      const isOwnerRequest = userId === ownerId;
 
-      if (userId === env.HOME_SERVER_OWNER_ID) {
+      if (isOwnerRequest) {
         return {
           ...payload,
           access: "owner" as const,
           allowedPaths: [] as string[],
+          personalRootPath: "",
+          manageableRoots: [""],
         };
       }
+
+      await ensurePersonalRoot(userId);
+
+      const personalRelativePath = getPersonalRelativePath(userId);
+      const existingPersonal =
+        findNodeByPath(payload.root, personalRelativePath) ?? {
+          id: personalRelativePath,
+          name: path.basename(personalRelativePath),
+          relativePath: personalRelativePath,
+          kind: "directory" as const,
+          children: [],
+          customMediaType: null,
+          inheritedMediaType: null,
+        };
+
+      const personalNode: MediaNode = {
+        ...existingPersonal,
+        name: "Mes fichiers",
+      };
+
+      const personalStats = computeNodeStats(personalNode);
 
       const shares = await getSharesForRecipient(userId);
+      const sharedFiltered =
+        shares.length > 0 ? filterLibraryForShares(payload, shares) : null;
 
-      if (shares.length === 0) {
-        return {
-          generatedAt: payload.generatedAt,
-          root: {
-            ...payload.root,
-            children: [],
-          },
-          totalFiles: 0,
-          totalVideos: 0,
-          totalDirectories: 1,
-          totalSize: 0,
-          access: "shared" as const,
-          allowedPaths: [] as string[],
-          availableMediaTypes: payload.availableMediaTypes,
-        };
-      }
+      const sharedChildren = (sharedFiltered?.node.children ?? []).filter(
+        (child) => child.relativePath !== personalRelativePath
+      );
 
-      const filtered = filterLibraryForShares(payload, shares);
+      const sharedStats = computeChildrenStats(sharedChildren);
+
+      const combinedChildren = [personalNode, ...sharedChildren];
+      const combinedStats = computeChildrenStats(combinedChildren);
 
       return {
         generatedAt: payload.generatedAt,
-        root: filtered.node,
-        totalFiles: filtered.stats.files,
-        totalVideos: filtered.stats.videos,
-        totalDirectories: filtered.stats.directories,
-        totalSize: filtered.stats.totalSize,
+        root: {
+          ...payload.root,
+          children: combinedChildren,
+        },
+        totalFiles: combinedStats.files,
+        totalVideos: combinedStats.videos,
+        totalDirectories: combinedStats.directories + 1,
+        totalSize: combinedStats.totalSize,
         access: "shared" as const,
         allowedPaths: shares.map((share) => share.path),
         availableMediaTypes: payload.availableMediaTypes,
+        personalRootPath: personalRelativePath,
+        manageableRoots: [personalRelativePath],
       };
     } catch (error) {
       app.log.error({ err: error }, "Failed to scan media library");
@@ -395,14 +575,6 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
-      reply.code(403);
-      return {
-        status: "error",
-        message: "Action réservée au propriétaire du serveur.",
-      };
-    }
-
     const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
     const query = request.query as { path?: string };
     const sanitizedPath = sanitizeRelativePath(query.path ?? undefined);
@@ -412,6 +584,15 @@ export async function createServer(): Promise<FastifyInstance> {
       return {
         status: "error",
         message: "Chemin invalide.",
+      };
+    }
+
+    const manageableRoots = await collectManageableRoots(userId);
+    if (!isPathWithinManageableRoots(sanitizedPath, manageableRoots)) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Action réservée à votre espace personnel.",
       };
     }
 
@@ -452,14 +633,6 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
-      reply.code(403);
-      return {
-        status: "error",
-        message: "Action réservée au propriétaire du serveur.",
-      };
-    }
-
     const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
     const body = request.body as Partial<{
       sourcePath: unknown;
@@ -479,6 +652,18 @@ export async function createServer(): Promise<FastifyInstance> {
       return {
         status: "error",
         message: "Chemins source ou destination invalides.",
+      };
+    }
+
+    const manageableRoots = await collectManageableRoots(userId);
+    if (
+      !isPathWithinManageableRoots(sanitizedSource, manageableRoots) ||
+      !isPathWithinManageableRoots(sanitizedDestination, manageableRoots)
+    ) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Action réservée à votre espace personnel.",
       };
     }
 
@@ -548,14 +733,6 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
-      reply.code(403);
-      return {
-        status: "error",
-        message: "Action réservée au propriétaire du serveur.",
-      };
-    }
-
     const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
     await fs.mkdir(mediaRoot, { recursive: true });
 
@@ -580,6 +757,47 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
+    const manageableRoots = await collectManageableRoots(userId);
+    let effectiveParent =
+      typeof sanitizedParent === "string" && sanitizedParent.length > 0
+        ? sanitizedParent
+        : "";
+
+    if (!manageableRoots.length) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Espace personnel indisponible pour cet utilisateur.",
+      };
+    }
+
+    if (userId !== ownerId) {
+      const primaryRoot =
+        manageableRoots.find((root) => root.length > 0) ?? getPersonalRelativePath(userId);
+
+      if (!manageableRoots.includes(primaryRoot)) {
+        manageableRoots.push(primaryRoot);
+      }
+
+      if (!effectiveParent) {
+        effectiveParent = primaryRoot;
+      } else if (!isPathWithinManageableRoots(effectiveParent, manageableRoots)) {
+        reply.code(403);
+        return {
+          status: "error",
+          message: "Impossible de créer un dossier en dehors de votre espace personnel.",
+        };
+      }
+    }
+
+    if (!isPathWithinManageableRoots(effectiveParent, manageableRoots)) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Chemin parent non autorisé.",
+      };
+    }
+
     const sanitizedName = sanitizeDirectoryName(
       typeof body?.name === "string" ? body.name : undefined
     );
@@ -593,8 +811,8 @@ export async function createServer(): Promise<FastifyInstance> {
     }
 
     const parentAbsolute =
-      sanitizedParent && sanitizedParent.length > 0
-        ? path.join(mediaRoot, sanitizedParent)
+      effectiveParent && effectiveParent.length > 0
+        ? path.join(mediaRoot, effectiveParent)
         : mediaRoot;
 
     if (!parentAbsolute.startsWith(mediaRoot)) {
@@ -610,7 +828,10 @@ export async function createServer(): Promise<FastifyInstance> {
     const ensureAvailable = body?.ensureAvailable !== false;
 
     const buildRelativePath = (name: string): string | null => {
-      const candidate = sanitizedParent && sanitizedParent.length > 0 ? `${sanitizedParent}/${name}` : name;
+      const candidate =
+        effectiveParent && effectiveParent.length > 0
+          ? `${effectiveParent}/${name}`
+          : name;
       return sanitizeRelativePath(candidate);
     };
 
@@ -621,6 +842,14 @@ export async function createServer(): Promise<FastifyInstance> {
       return {
         status: "error",
         message: "Chemin de dossier invalide.",
+      };
+    }
+
+    if (!isPathWithinManageableRoots(baseRelativePath, manageableRoots)) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Chemin de dossier en dehors de votre espace personnel.",
       };
     }
 
@@ -847,14 +1076,6 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
-      reply.code(403);
-      return {
-        status: "error",
-        message: "Action réservée au propriétaire du serveur.",
-      };
-    }
-
     const body = request.body as Partial<{
       path: unknown;
       mediaType: unknown;
@@ -902,6 +1123,23 @@ export async function createServer(): Promise<FastifyInstance> {
     const targetAbsolute =
       targetRelative.length > 0 ? path.join(mediaRoot, targetRelative) : mediaRoot;
 
+    const manageableRoots = await collectManageableRoots(userId);
+    if (targetRelative.length === 0 && userId !== ownerId) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Impossible de modifier le type du dossier racine.",
+      };
+    }
+
+    if (targetRelative.length > 0 && !isPathWithinManageableRoots(targetRelative, manageableRoots)) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Chemin de média non autorisé pour ce compte.",
+      };
+    }
+
     if (!targetAbsolute.startsWith(mediaRoot)) {
       reply.code(400);
       return {
@@ -947,6 +1185,10 @@ export async function createServer(): Promise<FastifyInstance> {
               : dirent.name;
             const normalized = sanitizeRelativePath(nextRelative);
             if (!normalized) {
+              continue;
+            }
+
+            if (!isPathWithinManageableRoots(normalized, manageableRoots)) {
               continue;
             }
 
@@ -1012,18 +1254,19 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
+    const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
+    await fs.mkdir(mediaRoot, { recursive: true });
+
+    const manageableRoots = await collectManageableRoots(userId);
+    if (!manageableRoots.length) {
       reply.code(403);
       return {
         status: "error",
-        message: "Action réservée au propriétaire du serveur.",
+        message: "Espace personnel indisponible pour cet utilisateur.",
         savedFiles: [] as UploadSummary[],
         errors: [] as UploadError[],
       };
     }
-
-    const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
-    await fs.mkdir(mediaRoot, { recursive: true });
 
     const savedFiles: UploadSummary[] = [];
     const errors: UploadError[] = [];
@@ -1053,7 +1296,18 @@ export async function createServer(): Promise<FastifyInstance> {
         continue;
       }
 
-      const absoluteTarget = path.join(mediaRoot, sanitizedPath);
+      const normalizedRelative = normalizeRelativePathForUser(sanitizedPath, manageableRoots);
+
+      if (!normalizedRelative || !isPathWithinManageableRoots(normalizedRelative, manageableRoots)) {
+        errors.push({
+          relativePath: sanitizedPath,
+          reason: "Chemin de destination non autorisé.",
+        });
+        await discardStream(filePart.file);
+        continue;
+      }
+
+      const absoluteTarget = path.join(mediaRoot, normalizedRelative);
 
       if (!absoluteTarget.startsWith(mediaRoot)) {
         errors.push({
@@ -1070,19 +1324,19 @@ export async function createServer(): Promise<FastifyInstance> {
         await pipeline(filePart.file, writeStream);
         const stats = await fs.stat(absoluteTarget);
         savedFiles.push({
-          relativePath: sanitizedPath,
+          relativePath: normalizedRelative,
           size: stats.size,
         });
       } catch (error) {
         request.log.error(
           {
             err: error,
-            relativePath: sanitizedPath,
+            relativePath: normalizedRelative,
           },
           "Failed to persist uploaded media file"
         );
         errors.push({
-          relativePath: sanitizedPath,
+          relativePath: normalizedRelative,
           reason: "Échec de l'écriture du fichier.",
         });
       }
@@ -1119,16 +1373,17 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
+    const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
+    await fs.mkdir(mediaRoot, { recursive: true });
+
+    const manageableRoots = await collectManageableRoots(userId);
+    if (!manageableRoots.length) {
       reply.code(403);
       return {
         status: "error",
-        message: "Action réservée au propriétaire du serveur.",
+        message: "Espace personnel indisponible pour cet utilisateur.",
       };
     }
-
-    const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
-    await fs.mkdir(mediaRoot, { recursive: true });
 
     const body = request.body as Partial<{
       filename: unknown;
@@ -1170,14 +1425,27 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    const sanitizedRelativePath =
+    const desiredPath =
       sanitizeRelativePath(explicitRelativePath ?? filename) ?? sanitizeRelativePath(filename);
 
-    if (!sanitizedRelativePath) {
+    const finalRelativePath =
+      desiredPath !== null && desiredPath !== undefined
+        ? normalizeRelativePathForUser(desiredPath, manageableRoots)
+        : null;
+
+    if (!finalRelativePath) {
       reply.code(400);
       return {
         status: "error",
         message: "Chemin de destination invalide.",
+      };
+    }
+
+    if (!isPathWithinManageableRoots(finalRelativePath, manageableRoots)) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Chemin de destination non autorisé pour ce compte.",
       };
     }
 
@@ -1186,7 +1454,7 @@ export async function createServer(): Promise<FastifyInstance> {
         ? totalChunks
         : Math.max(1, Math.ceil(totalSize / chunkSize));
 
-    const absolutePath = path.join(mediaRoot, sanitizedRelativePath);
+    const absolutePath = path.join(mediaRoot, finalRelativePath);
 
     if (!absolutePath.startsWith(mediaRoot)) {
       reply.code(400);
@@ -1199,10 +1467,11 @@ export async function createServer(): Promise<FastifyInstance> {
     try {
       const session = await createUploadSession({
         originalName: filename,
-        relativePath: sanitizedRelativePath,
+        relativePath: finalRelativePath,
         absolutePath,
         totalSize,
         chunkSize,
+        userId,
         totalChunks: computedTotalChunks,
       });
 
@@ -1235,14 +1504,6 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
-      reply.code(403);
-      return {
-        status: "error",
-        message: "Action réservée au propriétaire du serveur.",
-      };
-    }
-
     const query = request.query as { sessionId?: string; chunkIndex?: string };
     const sessionId = query.sessionId;
     const chunkIndex =
@@ -1257,6 +1518,15 @@ export async function createServer(): Promise<FastifyInstance> {
     }
 
     try {
+      const session = getUploadSession(sessionId);
+      if (session.userId !== userId && userId !== ownerId) {
+        reply.code(403);
+        return {
+          status: "error",
+          message: "Session d'upload non accessible.",
+        };
+      }
+
       const file = await request.file();
 
       if (!file) {
@@ -1295,14 +1565,6 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
-      reply.code(403);
-      return {
-        status: "error",
-        message: "Action réservée au propriétaire du serveur.",
-      };
-    }
-
     const body = request.body as Partial<{ sessionId: unknown }>;
     const sessionId = typeof body?.sessionId === "string" ? body.sessionId : undefined;
 
@@ -1315,6 +1577,15 @@ export async function createServer(): Promise<FastifyInstance> {
     }
 
     try {
+      const existingSession = getUploadSession(sessionId);
+      if (existingSession.userId !== userId && userId !== ownerId) {
+        reply.code(403);
+        return {
+          status: "error",
+          message: "Session d'upload non accessible.",
+        };
+      }
+
       const session = await finalizeUploadSession(sessionId);
       return {
         status: "ok",
@@ -1341,14 +1612,6 @@ export async function createServer(): Promise<FastifyInstance> {
       };
     }
 
-    if (userId !== env.HOME_SERVER_OWNER_ID) {
-      reply.code(403);
-      return {
-        status: "error",
-        message: "Action réservée au propriétaire du serveur.",
-      };
-    }
-
     const { sessionId } = request.params as { sessionId?: string };
     if (!sessionId) {
       reply.code(400);
@@ -1359,9 +1622,19 @@ export async function createServer(): Promise<FastifyInstance> {
     }
 
     try {
+      const session = getUploadSession(sessionId);
+      if (session.userId !== userId && userId !== ownerId) {
+        reply.code(403);
+        return {
+          status: "error",
+          message: "Session d'upload non accessible.",
+        };
+      }
+
       await abortUploadSession(sessionId);
       return {
         status: "ok",
+        aborted: sessionId,
       };
     } catch (error) {
       app.log.error({ err: error, sessionId }, "Failed to abort upload session");

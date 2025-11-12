@@ -41,5 +41,7 @@ export interface HomeMediaLibrary {
   access: HomeMediaAccessLevel;
   allowedPaths: string[];
   availableMediaTypes: HomeMediaTypeDefinition[];
+  personalRootPath: string;
+  manageableRoots: string[];
 }
 

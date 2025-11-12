@@ -34,16 +34,15 @@ const formatBytes = (value: number): string => {
 
 interface HomeMediaUploaderProps {
   userId: string;
-  isOwner: boolean;
 }
 
-export function HomeMediaUploader({ userId, isOwner }: HomeMediaUploaderProps) {
+export function HomeMediaUploader({ userId }: HomeMediaUploaderProps) {
   const healthQuery = useHomeServerHealth();
   const isHomeConfigured = healthQuery.enabled;
   const isHomeReachable =
     isHomeConfigured && !healthQuery.isError && Boolean(healthQuery.data);
 
-  const canUpload = isOwner && isHomeReachable;
+  const canUpload = isHomeReachable;
 
   const { uploads, activeUploads, startUploads, clearCompleted } =
     useUploadManager(userId);
@@ -192,24 +191,6 @@ export function HomeMediaUploader({ userId, isOwner }: HomeMediaUploaderProps) {
           <p>
             Lancez le service StreamNow Home (`make home` ou `make docker-up`)
             puis actualisez cette page afin de pouvoir déposer des fichiers.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!isOwner) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Consultation uniquement</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            Cette bibliothèque locale appartient à un autre compte. Vous pouvez
-            consulter les éléments partagés avec vous, mais seuls le
-            propriétaire du serveur StreamNow Home peut ajouter ou modifier des
-            fichiers locaux.
           </p>
         </CardContent>
       </Card>

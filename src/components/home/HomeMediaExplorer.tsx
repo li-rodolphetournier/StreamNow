@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Folder,
@@ -65,6 +65,9 @@ const summaryCache = new WeakMap<HomeMediaNode, MediaSummary>();
 interface HomeMediaExplorerProps {
   userId: string;
   isOwner: boolean;
+  ownerDisplayName: string;
+  ownerId: string | null;
+  currentUserLabel: string;
 }
 
 const mediaTypeMetadata: Record<
@@ -227,6 +230,8 @@ function MediaNodeRow({
   canDrag,
   onEditType,
   resolveMediaType,
+  resolveOwnerLabel,
+  isPersonalRoot = false,
 }: {
   node: HomeMediaNode;
   depth?: number;
@@ -244,19 +249,24 @@ function MediaNodeRow({
   canDrag: boolean;
   onEditType: (media: HomeMediaNode) => void;
   resolveMediaType: (media: HomeMediaNode) => ResolvedMediaType | null;
+  resolveOwnerLabel: (media: HomeMediaNode) => string;
+  isPersonalRoot?: boolean;
 }) {
   const canDelete = canManage && Boolean(node.relativePath);
   const isDeleting = deletingPath === node.relativePath;
   const isMoving = movingPath === node.relativePath;
   const isShareTarget = canShare && shareTargetPath === node.relativePath;
   const resolvedMediaType = resolveMediaType(node);
+  const ownerLabel = resolveOwnerLabel(node);
 
   if (node.kind === "directory") {
     const resolvedType = resolveMediaType(node);
     const summary = summarizeMedia(node);
     const palette =
       depth === 0
-        ? { border: "var(--primary)", bg: "rgba(var(--primary), 0.08)" }
+        ? isPersonalRoot
+          ? { border: "var(--primary)", bg: "rgba(var(--primary), 0.14)" }
+          : { border: "var(--secondary)", bg: "rgba(var(--secondary), 0.1)" }
         : depth === 1
         ? { border: "var(--secondary)", bg: "rgba(var(--secondary), 0.08)" }
         : { border: "var(--muted-foreground)", bg: "rgba(var(--muted-foreground), 0.08)" };
@@ -266,7 +276,8 @@ function MediaNodeRow({
         <div
           className={cn(
             "flex items-center justify-between rounded-md border-l-4 px-3 py-2 transition-colors",
-            isShareTarget && "ring-2 ring-primary/40"
+            isShareTarget && "ring-2 ring-primary/40",
+            isPersonalRoot && "ring-1 ring-primary/30"
           )}
           style={{
             marginLeft: depth * 24,
@@ -314,13 +325,20 @@ function MediaNodeRow({
               style={{
                 color:
                   depth === 0
-                    ? `rgb(var(--primary))`
+                    ? isPersonalRoot
+                      ? `rgb(var(--primary))`
+                      : `rgb(var(--secondary))`
                     : depth === 1
                     ? `rgb(var(--secondary))`
                     : `rgb(var(--muted-foreground))`,
               }}
             />
             <span className="font-medium">{node.name}</span>
+            {isPersonalRoot ? (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                Votre espace
+              </span>
+            ) : null}
             {resolvedType ? (
               <span
                 className={cn(
@@ -352,6 +370,9 @@ function MediaNodeRow({
                 {summary.videos} vidéo{summary.videos > 1 ? "s" : ""}
               </span>
               <span>{formatBytes(summary.size)}</span>
+              <span className="rounded-full bg-muted px-2 py-0.5">
+                Propriétaire : {ownerLabel}
+              </span>
             </div>
             <div className="flex items-center gap-1">
               {canManage && node.relativePath ? (
@@ -426,8 +447,10 @@ function MediaNodeRow({
             canManage={canManage}
             canShare={canShare}
             canDrag={canDrag}
-              onEditType={onEditType}
-              resolveMediaType={resolveMediaType}
+            onEditType={onEditType}
+            resolveMediaType={resolveMediaType}
+            resolveOwnerLabel={resolveOwnerLabel}
+            isPersonalRoot={isPersonalRoot}
           />
         ))}
       </div>
@@ -539,6 +562,9 @@ function MediaNodeRow({
               {new Date(node.modifiedAt).toLocaleDateString()}
             </time>
           ) : null}
+          <span className="rounded-full bg-muted px-2 py-0.5">
+            Propriétaire : {ownerLabel}
+          </span>
         </div>
         <div className="flex items-center gap-1">
           {canManage && node.relativePath ? (
@@ -599,7 +625,13 @@ function MediaNodeRow({
   );
 }
 
-export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
+export function HomeMediaExplorer({
+  userId,
+  isOwner,
+  ownerDisplayName,
+  ownerId,
+  currentUserLabel,
+}: HomeMediaExplorerProps) {
   const healthQuery = useHomeServerHealth();
   const isHomeConfigured = healthQuery.enabled;
   const isHomeReachable =
@@ -624,27 +656,69 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
     [availableMediaTypes]
   );
 
+  const manageableRoots = useMemo(
+    () => mediaQuery.data?.manageableRoots ?? (isOwner ? [""] : []),
+    [isOwner, mediaQuery.data?.manageableRoots]
+  );
+
+  const personalRootPath = mediaQuery.data?.personalRootPath ?? (isOwner ? "" : "");
+
+  const canManagePath = useCallback(
+    (relativePath?: string | null) => {
+      if (isOwner) {
+        return true;
+      }
+      if (!relativePath) {
+        return false;
+      }
+
+      return manageableRoots.some((root) => {
+        if (!root) {
+          return true;
+        }
+        return relativePath === root || relativePath.startsWith(`${root}/`);
+      });
+    },
+    [isOwner, manageableRoots]
+  );
+
+  const normalizeDestinationPath = useCallback(
+    (value: string) => {
+      const trimmed = value.trim().replace(/^[\\/]+/, "").replace(/\\/g, "/");
+      if (!trimmed) {
+        return "";
+      }
+
+      if (isOwner || !personalRootPath) {
+        return trimmed;
+      }
+
+      if (
+        trimmed === personalRootPath ||
+        trimmed.startsWith(`${personalRootPath}/`)
+      ) {
+        return trimmed;
+      }
+
+      return `${personalRootPath}/${trimmed}`.replace(/\/{2,}/g, "/");
+    },
+    [isOwner, personalRootPath]
+  );
+
+  const canCreateDirectories = manageableRoots.length > 0;
+
   const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [draggedNode, setDraggedNode] = useState<HomeMediaNode | null>(null);
   const [shareTarget, setShareTarget] = useState<HomeMediaNode | null>(null);
-
-  const deleteMutation = useMutation({
-    mutationFn: (path: string) => deleteHomeMedia(path, userId),
-  });
-
-  const createDirectoryMutation = useMutation({
-    mutationFn: ({
-      name,
-      parentPath,
-    }: {
-      name: string;
-      parentPath?: string;
-    }) => createHomeDirectory(name, userId, parentPath),
-  });
-
+  const [isCreateDirectoryDialogOpen, setIsCreateDirectoryDialogOpen] = useState(false);
+  const [newDirectoryName, setNewDirectoryName] = useState("");
+  const [renameDialogNode, setRenameDialogNode] = useState<HomeMediaNode | null>(null);
+  const [renamePath, setRenamePath] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [deleteTypeError, setDeleteTypeError] = useState<string | null>(null);
   const [typeDialogNode, setTypeDialogNode] = useState<HomeMediaNode | null>(null);
   const [selectedMediaType, setSelectedMediaType] = useState<HomeLibraryMediaType | "">("");
   const [applyTypeToChildren, setApplyTypeToChildren] = useState(true);
@@ -659,7 +733,76 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
   const [iconSearchResults, setIconSearchResults] = useState<string[]>([]);
   const [isIconSearchLoading, setIsIconSearchLoading] = useState(false);
   const [iconSearchError, setIconSearchError] = useState<string | null>(null);
-  const [deleteTypeError, setDeleteTypeError] = useState<string | null>(null);
+
+  const friendsOverviewQuery = useFriendsOverview(true);
+  const friendUsers = friendsOverviewQuery.data?.friends ?? [];
+
+  const ownerLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+
+    const register = (id: string | null | undefined, ...labels: Array<string | null | undefined>) => {
+      if (!id) {
+        return;
+      }
+      for (const label of labels) {
+        if (typeof label === "string") {
+          const trimmed = label.trim();
+          if (trimmed.length > 0) {
+            map.set(id, trimmed);
+            return;
+          }
+        }
+      }
+      map.set(id, id.slice(0, 8));
+    };
+
+    register(userId, currentUserLabel);
+    if (ownerId && ownerId !== userId) {
+      register(ownerId, ownerDisplayName);
+    }
+
+    for (const entry of friendUsers) {
+      const friendUser = entry.friend;
+      if (!friendUser) {
+        continue;
+      }
+      register(friendUser.id, friendUser.nickname ?? undefined, friendUser.email ?? undefined);
+    }
+
+    return map;
+  }, [friendUsers, currentUserLabel, ownerDisplayName, ownerId, userId]);
+
+  const resolveOwnerIdForNode = useCallback(
+    (media: HomeMediaNode): string => {
+      const relativePath = media.relativePath ?? "";
+      const segments = relativePath.split("/").filter(Boolean);
+
+      if (segments.length >= 2 && segments[0] === "users") {
+        return segments[1];
+      }
+
+      return ownerId ?? userId;
+    },
+    [ownerId, userId]
+  );
+
+  const resolveOwnerLabel = useCallback(
+    (media: HomeMediaNode): string => {
+      const ownerKey = resolveOwnerIdForNode(media);
+      const mapped = ownerLabelMap.get(ownerKey);
+      if (mapped) {
+        return mapped;
+      }
+      if (ownerKey === userId) {
+        return currentUserLabel;
+      }
+      if (ownerKey === (ownerId ?? "")) {
+        return ownerDisplayName;
+      }
+      return ownerKey?.slice(0, 8) ?? ownerDisplayName;
+    },
+    [currentUserLabel, ownerDisplayName, ownerId, ownerLabelMap, resolveOwnerIdForNode, userId]
+  );
 
   useEffect(() => {
     if (!isCreateTypeDialogOpen) {
@@ -674,6 +817,13 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
       setDeleteTypeError(null);
     }
   }, [isCreateTypeDialogOpen]);
+
+  useEffect(() => {
+    if (!isCreateDirectoryDialogOpen) {
+      setNewDirectoryName("");
+      setCreateError(null);
+    }
+  }, [isCreateDirectoryDialogOpen]);
 
   const setMediaTypeMutation = useMutation({
     mutationFn: ({
@@ -698,6 +848,20 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
     mutationFn: (typeId: string) => deleteHomeMediaTypeDefinition(typeId, userId),
   });
   const isDeletingType = deleteTypeMutation.isPending;
+
+  const createDirectoryMutation = useMutation({
+    mutationFn: ({
+      name,
+      parentPath,
+    }: {
+      name: string;
+      parentPath?: string;
+    }) => createHomeDirectory(name, userId, parentPath),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (path: string) => deleteHomeMedia(path, userId),
+  });
 
   const resolveMediaType = useCallback(
     (media: HomeMediaNode): ResolvedMediaType | null => {
@@ -726,7 +890,8 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
 
   const openTypeDialog = useCallback(
     (node: HomeMediaNode) => {
-      if (!isOwner || !node.relativePath) {
+      if (!node.relativePath || !canManagePath(node.relativePath)) {
+        toast.error("Action réservée à votre espace personnel.");
         return;
       }
 
@@ -736,7 +901,7 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
       setTypeErrorMessage(null);
       setTypeDialogNode(node);
     },
-    [isOwner]
+    [canManagePath, toast]
   );
 
   const closeTypeDialog = useCallback(() => {
@@ -942,11 +1107,12 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
             closeTypeDialog();
           },
           onError: (error) => {
-            setTypeErrorMessage(
+            const message =
               error instanceof Error
                 ? error.message
-                : "Impossible de mettre à jour le type de média."
-            );
+                : "Impossible de mettre à jour le type de média.";
+            setTypeErrorMessage(message);
+            toast.error(message);
           },
         }
       );
@@ -959,12 +1125,14 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
       queryClient,
       userId,
       closeTypeDialog,
+      toast,
     ]
   );
 
   const handleDelete = useCallback(
     async (node: HomeMediaNode) => {
-      if (!isOwner || !node.relativePath) {
+      if (!node.relativePath || !canManagePath(node.relativePath)) {
+        toast.error("Action réservée à votre espace personnel.");
         return;
       }
 
@@ -1007,7 +1175,7 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
         },
       });
     },
-    [confirmToast, deleteMutation, isOwner, queryClient, toast, userId]
+    [canManagePath, confirmToast, deleteMutation, queryClient, toast, userId]
   );
 
   const deletingPath = deleteMutation.isPending ? pendingDeletePath : null;
@@ -1024,46 +1192,110 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
 
   const handleMove = useCallback(
     (node: HomeMediaNode) => {
-      if (!isOwner || !node.relativePath) {
+      if (!node.relativePath) {
+        toast.error("Impossible de renommer la racine de la bibliothèque.");
         return;
       }
 
-      const currentPath = node.relativePath;
-      const destinationPath = window.prompt(
-        "Nouveau chemin (relatif) pour ce fichier/dossier :",
-        currentPath
-      );
-
-      if (!destinationPath || destinationPath.trim() === currentPath) {
+      if (!canManagePath(node.relativePath)) {
+        toast.error("Action réservée à votre espace personnel.");
         return;
       }
 
       setMoveError(null);
-      setPendingDeletePath(null);
-      setShareTarget(null);
+      setRenameDialogNode(node);
+      setRenamePath(node.relativePath);
+      setRenameError(null);
+    },
+    [canManagePath, toast]
+  );
+
+  const closeRenameDialog = useCallback(() => {
+    setRenameDialogNode(null);
+    setRenamePath("");
+    setRenameError(null);
+  }, []);
+
+  const handleSubmitRename = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      if (!renameDialogNode || !renameDialogNode.relativePath) {
+        closeRenameDialog();
+        return;
+      }
+
+      const trimmed = renamePath.trim();
+
+      if (!trimmed) {
+        setRenameError("Le chemin cible est obligatoire.");
+        return;
+      }
+
+      if (!canManagePath(renameDialogNode.relativePath)) {
+        const message = "Vous ne pouvez pas modifier cet élément partagé.";
+        setRenameError(message);
+        toast.error(message);
+        return;
+      }
+
+      const destination = normalizeDestinationPath(trimmed);
+
+      if (!destination) {
+        setRenameError("Le chemin cible est obligatoire.");
+        return;
+      }
+
+      if (destination === renameDialogNode.relativePath) {
+        closeRenameDialog();
+        return;
+      }
+
+      if (!canManagePath(destination)) {
+        const message = "La destination doit appartenir à votre espace personnel.";
+        setRenameError(message);
+        toast.error(message);
+        return;
+      }
+
+      setMoveError(null);
+      setRenameError(null);
 
       moveMutation.mutate(
         {
-          source: currentPath,
-          destination: destinationPath.trim(),
+          source: renameDialogNode.relativePath,
+          destination,
         },
         {
           onSuccess: async () => {
             await queryClient.invalidateQueries({
               queryKey: ["home-media-library", userId],
             });
+            toast.success("Chemin mis à jour.");
+            closeRenameDialog();
           },
           onError: (error) => {
             const message =
               error instanceof Error
                 ? error.message
                 : "Impossible de déplacer ou renommer cet élément.";
-            setMoveError(message);
+            setRenameError(message);
+            toast.error(message);
           },
         }
       );
     },
-    [isOwner, moveMutation, queryClient, userId]
+    [
+      canManagePath,
+      closeRenameDialog,
+      moveMutation,
+      normalizeDestinationPath,
+      queryClient,
+      renameDialogNode,
+      renamePath,
+      toast,
+      userId,
+    ]
   );
 
   const movingPath = moveMutation.isPending ? moveMutation.variables?.source ?? null : null;
@@ -1072,11 +1304,13 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
 
   const handleFileDrop = useCallback(
     (source: HomeMediaNode, target: HomeMediaNode) => {
-      if (!isOwner) {
+      if (!source.relativePath) {
         return;
       }
 
-      if (!source.relativePath) {
+      if (!canManagePath(source.relativePath)) {
+        toast.error("Action réservée à votre espace personnel.");
+        setDraggedNode(null);
         return;
       }
 
@@ -1095,8 +1329,16 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
         return;
       }
 
+      const normalizedDestination = normalizeDestinationPath(destination);
+
+      if (!normalizedDestination || !canManagePath(normalizedDestination)) {
+        toast.error("Destination non autorisée.");
+        setDraggedNode(null);
+        return;
+      }
+
       moveMutation.mutate(
-        { source: source.relativePath, destination },
+        { source: source.relativePath, destination: normalizedDestination },
         {
           onSuccess: async () => {
             await queryClient.invalidateQueries({
@@ -1109,6 +1351,7 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
                 ? error.message
                 : "Impossible de déplacer cet élément.";
             setMoveError(message);
+            toast.error(message);
           },
           onSettled: () => {
             setDraggedNode(null);
@@ -1117,7 +1360,7 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
         }
       );
     },
-    [isOwner, moveMutation, queryClient, userId]
+    [canManagePath, moveMutation, normalizeDestinationPath, queryClient, toast, userId]
   );
 
   const handleShare = useCallback(
@@ -1132,44 +1375,66 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
     [isOwner]
   );
 
-  const handleCreateDirectory = useCallback(() => {
-    if (!isOwner) {
-      return;
-    }
-
-    const rawName = window.prompt("Nom du nouveau dossier :");
-
-    if (!rawName) {
-      return;
-    }
-
-    const trimmed = rawName.trim();
-
-    if (!trimmed) {
+  const handleOpenCreateDirectoryDialog = useCallback(() => {
+    if (!canCreateDirectories) {
+      toast.error("Action indisponible pour ce compte.");
       return;
     }
 
     setCreateError(null);
+    setNewDirectoryName("");
+    setIsCreateDirectoryDialogOpen(true);
+  }, [canCreateDirectories, toast]);
 
-    createDirectoryMutation.mutate(
-      { name: trimmed },
-      {
-        onSuccess: async () => {
-          setCreateError(null);
-          await queryClient.invalidateQueries({
-            queryKey: ["home-media-library", userId],
-          });
-        },
-        onError: (error) => {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Impossible de créer le dossier.";
-          setCreateError(message);
-        },
+  const handleSubmitCreateDirectory = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      if (!canCreateDirectories) {
+        toast.error("Action indisponible pour ce compte.");
+        return;
       }
-    );
-  }, [createDirectoryMutation, isOwner, queryClient, userId]);
+
+      const trimmed = newDirectoryName.trim();
+
+      if (!trimmed) {
+        setCreateError("Le nom du dossier est obligatoire.");
+        return;
+      }
+
+      setCreateError(null);
+
+      createDirectoryMutation.mutate(
+        { name: trimmed },
+        {
+          onSuccess: async () => {
+            setCreateError(null);
+            setIsCreateDirectoryDialogOpen(false);
+            await queryClient.invalidateQueries({
+              queryKey: ["home-media-library", userId],
+            });
+            toast.success(`Dossier « ${trimmed} » créé.`);
+          },
+          onError: (error) => {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Impossible de créer le dossier.";
+            setCreateError(message);
+            toast.error(message);
+          },
+        }
+      );
+    },
+    [
+      canCreateDirectories,
+      createDirectoryMutation,
+      newDirectoryName,
+      queryClient,
+      toast,
+      userId,
+    ]
+  );
 
   const rootNode = mediaQuery.data?.root;
   const hasMedia =
@@ -1177,7 +1442,9 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
 
   const accessLevel = mediaQuery.data?.access ?? (isOwner ? "owner" : "shared");
   const allowedPaths = mediaQuery.data?.allowedPaths ?? [];
-  const isSharedView = accessLevel === "shared";
+  const hasPersonalAccess = manageableRoots.some((root) => root.length > 0);
+  const isSharedViewOnly = accessLevel === "shared" && !hasPersonalAccess;
+  const isHybridView = accessLevel === "shared" && hasPersonalAccess;
 
   const rootSummary = useMemo(() => {
     if (!rootNode) {
@@ -1185,6 +1452,18 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
     }
     return summarizeMedia(rootNode);
   }, [rootNode]);
+
+  const topLevelNodes = mediaQuery.data?.root.children ?? [];
+  const personalNode =
+    personalRootPath && personalRootPath.length > 0
+      ? topLevelNodes.find((child) => child.relativePath === personalRootPath)
+      : null;
+  const showPersonalSection = Boolean(personalNode && personalRootPath.length > 0);
+  const sharedNodes = personalNode
+    ? topLevelNodes.filter((child) => child.relativePath !== personalNode.relativePath)
+    : topLevelNodes;
+
+  const personalSummary = showPersonalSection && personalNode ? summarizeMedia(personalNode) : null;
 
   if (!isHomeConfigured) {
     return (
@@ -1289,14 +1568,14 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
   }
 
   if (!mediaQuery.data || !hasMedia) {
-    const title = isSharedView ? "Aucun élément partagé" : "Aucun média détecté";
+    const title = isSharedViewOnly ? "Aucun élément partagé" : "Aucun média détecté";
     return (
       <Card>
         <CardHeader>
           <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          {isSharedView ? (
+          {isSharedViewOnly ? (
             <>
               <p>
                 Aucun dossier ou fichier ne vous a encore été partagé. Demandez
@@ -1334,9 +1613,14 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
               {new Date(mediaQuery.data.generatedAt).toLocaleString()}
             </time>
           </p>
-          {isSharedView ? (
+          {isSharedViewOnly ? (
             <p className="text-xs text-muted-foreground">
               Vue limitée aux éléments partagés avec vous.
+            </p>
+          ) : null}
+          {isHybridView ? (
+            <p className="text-xs text-muted-foreground">
+              Vous voyez votre espace personnel ainsi que les éléments partagés avec vous.
             </p>
           ) : null}
         </div>
@@ -1354,78 +1638,194 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
               </span>
             </div>
           ) : null}
-          {isOwner ? (
-            <div className="flex flex-col gap-2 md:flex-row">
-              <Button
-                size="sm"
-                onClick={handleCreateDirectory}
-                disabled={isCreatingDirectory}
-              >
-                {isCreatingDirectory ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <FolderPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-                )}
-                Nouveau dossier
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleOpenCreateTypeDialog}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" aria-hidden="true" />
-                Créer un type de média
-              </Button>
-            </div>
-          ) : null}
+          <span className="text-xs text-muted-foreground">
+            Propriétaire du serveur : {ownerDisplayName}
+          </span>
+          <div className="flex flex-col gap-2 md:flex-row">
+            <Button
+              size="sm"
+              onClick={handleOpenCreateDirectoryDialog}
+              disabled={!canCreateDirectories || isCreatingDirectory}
+              title={
+                !canCreateDirectories ? "Action indisponible pour ce compte." : undefined
+              }
+            >
+              {isCreatingDirectory ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <FolderPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+              )}
+              Nouveau dossier
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenCreateTypeDialog}
+              disabled={!isOwner}
+              title={!isOwner ? "Action réservée au propriétaire du serveur." : undefined}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" aria-hidden="true" />
+              Créer un type de média
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {isOwner && deleteError ? (
+      <CardContent className="space-y-4">
+        {deleteError ? (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {deleteError}
           </div>
         ) : null}
-        {isOwner && moveError ? (
+        {moveError ? (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {moveError}
           </div>
         ) : null}
-        {isOwner && createError ? (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {createError}
-          </div>
-        ) : null}
-        {(mediaQuery.data.root.children ?? []).map((child) => (
-          <Fragment key={`${child.kind}-${child.id}`}>
-            <MediaNodeRow
-              node={child}
-              onDelete={handleDelete}
-              onRename={handleMove}
-              onShare={handleShare}
-              deletingPath={deletingPath}
-              movingPath={movingPath}
-              onDrop={handleFileDrop}
-              onDragChange={setDraggedNode}
-              currentDrag={draggedNode}
-              shareTargetPath={shareTargetPath}
-              canManage={isOwner}
-              canShare={isOwner}
-              canDrag={isOwner}
-              onEditType={openTypeDialog}
-              resolveMediaType={resolveMediaType}
-            />
-            {isOwner && shareTarget && shareTargetPath === child.relativePath ? (
-              <LocalMediaSharePanel
-                target={shareTarget}
-                onClose={() => setShareTarget(null)}
+
+        {showPersonalSection && personalNode ? (
+          <section className="space-y-3 rounded-lg border border-primary/15 bg-primary/5 p-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Vos fichiers</h3>
+                <p className="text-xs text-muted-foreground">
+                  {personalSummary
+                    ? `${personalSummary.files} fichier${personalSummary.files > 1 ? "s" : ""} • ${personalSummary.videos} vidéo${personalSummary.videos > 1 ? "s" : ""} • ${formatBytes(personalSummary.size)}`
+                    : "Dossier personnel"}
+                </p>
+              </div>
+            </div>
+            <Fragment key={`${personalNode.kind}-${personalNode.id}`}>
+              <MediaNodeRow
+                node={personalNode}
+                onDelete={handleDelete}
+                onRename={handleMove}
+                onShare={handleShare}
+                deletingPath={deletingPath}
+                movingPath={movingPath}
+                onDrop={handleFileDrop}
+                onDragChange={setDraggedNode}
+                currentDrag={draggedNode}
+                shareTargetPath={shareTargetPath}
+                canManage={canManagePath(personalNode.relativePath)}
+                canShare={isOwner}
+                canDrag={canManagePath(personalNode.relativePath)}
+                onEditType={openTypeDialog}
+                resolveMediaType={resolveMediaType}
+                resolveOwnerLabel={resolveOwnerLabel}
+                isPersonalRoot
               />
-            ) : null}
-          </Fragment>
-        ))}
+              {isOwner && shareTarget && shareTargetPath === personalNode.relativePath ? (
+                <LocalMediaSharePanel
+                  target={shareTarget}
+                  onClose={() => setShareTarget(null)}
+                />
+              ) : null}
+            </Fragment>
+          </section>
+        ) : null}
+
+        {sharedNodes.length > 0 ? (
+          <section className="space-y-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-sm font-semibold">Partages reçus</h3>
+              <span className="text-xs text-muted-foreground">
+                {sharedNodes.length} dossier{sharedNodes.length > 1 ? "s" : ""}
+              </span>
+            </div>
+            {sharedNodes.map((child) => (
+              <Fragment key={`${child.kind}-${child.id}`}>
+                <MediaNodeRow
+                  node={child}
+                  onDelete={handleDelete}
+                  onRename={handleMove}
+                  onShare={handleShare}
+                  deletingPath={deletingPath}
+                  movingPath={movingPath}
+                  onDrop={handleFileDrop}
+                  onDragChange={setDraggedNode}
+                  currentDrag={draggedNode}
+                  shareTargetPath={shareTargetPath}
+                  canManage={canManagePath(child.relativePath)}
+                  canShare={isOwner}
+                  canDrag={canManagePath(child.relativePath)}
+                  onEditType={openTypeDialog}
+                  resolveMediaType={resolveMediaType}
+                  resolveOwnerLabel={resolveOwnerLabel}
+                />
+                {isOwner && shareTarget && shareTargetPath === child.relativePath ? (
+                  <LocalMediaSharePanel
+                    target={shareTarget}
+                    onClose={() => setShareTarget(null)}
+                  />
+                ) : null}
+              </Fragment>
+            ))}
+          </section>
+        ) : null}
+
+        {!isOwner && sharedNodes.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Aucun dossier ne vous a encore été partagé.
+          </p>
+        ) : null}
       </CardContent>
       </Card>
+      <Dialog
+        open={isCreateDirectoryDialogOpen}
+        onOpenChange={(open) => setIsCreateDirectoryDialogOpen(open)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nouveau dossier</DialogTitle>
+            <DialogDescription>
+              Créez un dossier à la racine de votre bibliothèque locale StreamNow Home.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleSubmitCreateDirectory}>
+            <div className="space-y-2">
+              <Label htmlFor="new-directory-name">Nom du dossier</Label>
+              <Input
+                id="new-directory-name"
+                value={newDirectoryName}
+                onChange={(event) => setNewDirectoryName(event.target.value)}
+                placeholder="Ex. Documents"
+                autoFocus
+                disabled={isCreatingDirectory}
+              />
+              <p className="text-xs text-muted-foreground">
+                Le chemin est relatif depuis la racine configurée sur le serveur.
+              </p>
+            </div>
+            {createError ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {createError}
+              </div>
+            ) : null}
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateDirectoryDialogOpen(false)}
+                disabled={isCreatingDirectory}
+              >
+                Annuler
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  isCreatingDirectory || newDirectoryName.trim().length === 0
+                }
+              >
+                {isCreatingDirectory && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                )}
+                Créer
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {isOwner ? (
         <Dialog
           open={isCreateTypeDialogOpen}
@@ -1461,7 +1861,7 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
                   disabled={isCreatingType}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Utilisé dans les scripts et l’API. Laissez vide pour le générer automatiquement.
+                  Utilisé dans les scripts et l'API. Laissez vide pour le générer automatiquement.
                 </p>
               </div>
               <div className="space-y-2">
@@ -1620,7 +2020,7 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
                     onClick={() => setNewTypeIcon("")}
                     disabled={isCreatingType || newTypeIcon.length === 0}
                   >
-                    Réinitialiser l’icône
+                    Réinitialiser l'icône
                   </Button>
                 </div>
               </div>
@@ -1675,7 +2075,7 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
             </DialogDescription>
           </DialogHeader>
           {typeDialogNode ? (
-            <form className="space-y-4" onSubmit={handleSubmitType}>
+            <form className="space-y-4 overflow-y-auto" onSubmit={handleSubmitType}>
               <div className="space-y-2">
                 <Label className="text-xs uppercase text-muted-foreground">
                   Chemin
@@ -1746,6 +2146,69 @@ export function HomeMediaExplorer({ userId, isOwner }: HomeMediaExplorerProps) {
                 </Button>
                 <Button type="submit" disabled={isSavingMediaType}>
                   {isSavingMediaType && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  )}
+                  Enregistrer
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(renameDialogNode)}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRenameDialog();
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renommer ou déplacer</DialogTitle>
+            <DialogDescription>
+              Modifiez le chemin relatif pour déplacer ou renommer cet élément dans la bibliothèque.
+            </DialogDescription>
+          </DialogHeader>
+          {renameDialogNode ? (
+            <form className="space-y-4" onSubmit={handleSubmitRename}>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground">
+                  Chemin actuel
+                </Label>
+                <code className="block rounded bg-muted px-2 py-1 text-xs">
+                  {renameDialogNode.relativePath}
+                </code>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rename-path">Nouveau chemin relatif</Label>
+                <Input
+                  id="rename-path"
+                  value={renamePath}
+                  onChange={(event) => setRenamePath(event.target.value)}
+                  disabled={moveMutation.isPending}
+                  placeholder="exemple/dossier/nom"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Les dossiers intermédiaires doivent exister. Utilisez « / » pour définir la hiérarchie.
+                </p>
+              </div>
+              {renameError ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {renameError}
+                </div>
+              ) : null}
+              <DialogFooter className="gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeRenameDialog}
+                  disabled={moveMutation.isPending}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={moveMutation.isPending}>
+                  {moveMutation.isPending && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                   )}
                   Enregistrer

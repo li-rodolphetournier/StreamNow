@@ -15,6 +15,7 @@ export interface UploadSession {
   receivedChunks: Set<number>;
   receivedBytes: number;
   createdAt: number;
+  userId: string;
 }
 
 const sessions = new Map<string, UploadSession>();
@@ -34,8 +35,10 @@ export const createUploadSession = async (input: {
   totalSize: number;
   chunkSize: number;
   totalChunks: number;
+  userId: string;
 }): Promise<UploadSession> => {
-  const { originalName, relativePath, absolutePath, totalSize, chunkSize, totalChunks } = input;
+  const { originalName, relativePath, absolutePath, totalSize, chunkSize, totalChunks, userId } =
+    input;
 
   if (sessions.size > 10_000) {
     // Basic safeguard to avoid unbounded memory usage
@@ -60,6 +63,7 @@ export const createUploadSession = async (input: {
     receivedChunks: new Set(),
     receivedBytes: 0,
     createdAt: Date.now(),
+    userId,
   };
 
   sessions.set(id, session);
