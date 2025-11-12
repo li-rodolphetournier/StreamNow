@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import type { MutableRefObject, ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import ReactPlayer from "react-player";
 import { VideoPlayer } from "./VideoPlayer";
 import type { Video } from "@/types/video";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
@@ -19,46 +20,12 @@ const mockedUseVideoPlayer = jest.mocked(useVideoPlayer);
 const mockedGetMovieVideos = jest.mocked(getMovieVideos);
 const mockedGetTVShowVideos = jest.mocked(getTVShowVideos);
 
-interface MockPlayerRef {
-  current: {
-    seekTo: jest.Mock;
-    getCurrentTime: jest.Mock;
-    getSecondsLoaded: jest.Mock;
-    getDuration: jest.Mock;
-    getInternalPlayer: jest.Mock;
-    showPreview: jest.Mock;
-    wrapper: unknown;
-    props: unknown;
-    state: unknown;
-    handleClickPreview: jest.Mock;
-    handleMouseMove: jest.Mock;
-    isReady: boolean;
-  };
-}
+type VideoPlayerHookState = ReturnType<typeof useVideoPlayer>;
 
-interface MockHookState {
-  isPlaying: boolean;
-  setIsPlaying: jest.Mock;
-  volume: number;
-  setVolume: jest.Mock;
-  isMuted: boolean;
-  setIsMuted: jest.Mock;
-  played: number;
-  setPlayed: jest.Mock;
-  playedSeconds: number;
-  setPlayedSeconds: jest.Mock;
-  duration: number;
-  setDuration: jest.Mock;
-  isFullscreen: boolean;
-  toggleFullscreen: jest.Mock;
-  showControls: boolean;
-  setShowControls: jest.Mock;
-  resetControlsTimeout: jest.Mock;
-  playerRef: MockPlayerRef;
-}
-
-const createMockPlayerRef = (): MockPlayerRef => ({
-  current: {
+const createHookState = (
+  overrides: Partial<VideoPlayerHookState> = {}
+): VideoPlayerHookState => {
+  const mockReactPlayer = {
     seekTo: jest.fn(),
     getCurrentTime: jest.fn(() => 0),
     getSecondsLoaded: jest.fn(() => 0),
@@ -71,30 +38,34 @@ const createMockPlayerRef = (): MockPlayerRef => ({
     handleClickPreview: jest.fn(),
     handleMouseMove: jest.fn(),
     isReady: false,
-  },
-});
+  } as unknown as ReactPlayer;
 
-const createHookState = (overrides: Partial<MockHookState> = {}): MockHookState => ({
-  isPlaying: false,
-  setIsPlaying: jest.fn(),
-  volume: 1,
-  setVolume: jest.fn(),
-  isMuted: false,
-  setIsMuted: jest.fn(),
-  played: 0,
-  setPlayed: jest.fn(),
-  playedSeconds: 0,
-  setPlayedSeconds: jest.fn(),
-  duration: 0,
-  setDuration: jest.fn(),
-  isFullscreen: false,
-  toggleFullscreen: jest.fn(),
-  showControls: true,
-  setShowControls: jest.fn(),
-  resetControlsTimeout: jest.fn(),
-  playerRef: createMockPlayerRef(),
-  ...overrides,
-});
+  const base: VideoPlayerHookState = {
+    isPlaying: false,
+    setIsPlaying: jest.fn() as VideoPlayerHookState["setIsPlaying"],
+    volume: 1,
+    setVolume: jest.fn() as VideoPlayerHookState["setVolume"],
+    isMuted: false,
+    setIsMuted: jest.fn() as VideoPlayerHookState["setIsMuted"],
+    played: 0,
+    setPlayed: jest.fn() as VideoPlayerHookState["setPlayed"],
+    playedSeconds: 0,
+    setPlayedSeconds: jest.fn() as VideoPlayerHookState["setPlayedSeconds"],
+    duration: 0,
+    setDuration: jest.fn() as VideoPlayerHookState["setDuration"],
+    isFullscreen: false,
+    toggleFullscreen: jest.fn() as VideoPlayerHookState["toggleFullscreen"],
+    showControls: true,
+    setShowControls: jest.fn() as VideoPlayerHookState["setShowControls"],
+    resetControlsTimeout: jest.fn() as VideoPlayerHookState["resetControlsTimeout"],
+    playerRef: { current: mockReactPlayer } as MutableRefObject<ReactPlayer | null>,
+  };
+
+  return {
+    ...base,
+    ...overrides,
+  };
+};
 
 const renderWithQueryClient = (ui: ReactNode) => {
   const queryClient = new QueryClient({
