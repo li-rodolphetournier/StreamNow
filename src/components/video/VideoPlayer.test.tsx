@@ -22,10 +22,8 @@ const mockedGetTVShowVideos = jest.mocked(getTVShowVideos);
 
 type VideoPlayerHookState = ReturnType<typeof useVideoPlayer>;
 
-const createHookState = (
-  overrides: Partial<VideoPlayerHookState> = {}
-): VideoPlayerHookState => {
-  const mockReactPlayer = {
+const createMockPlayerRef = (): MutableRefObject<ReactPlayer | null> => ({
+  current: {
     seekTo: jest.fn(),
     getCurrentTime: jest.fn(() => 0),
     getSecondsLoaded: jest.fn(() => 0),
@@ -33,13 +31,17 @@ const createHookState = (
     getInternalPlayer: jest.fn(() => null),
     showPreview: jest.fn(),
     wrapper: null,
-    props: {},
-    state: {},
+    props: {} as Record<string, unknown>,
+    state: {} as Record<string, unknown>,
     handleClickPreview: jest.fn(),
     handleMouseMove: jest.fn(),
     isReady: false,
-  } as unknown as ReactPlayer;
+  } as unknown as ReactPlayer,
+});
 
+const createHookState = (
+  overrides: Partial<VideoPlayerHookState> = {}
+): VideoPlayerHookState => {
   const base: VideoPlayerHookState = {
     isPlaying: false,
     setIsPlaying: jest.fn() as VideoPlayerHookState["setIsPlaying"],
@@ -58,7 +60,7 @@ const createHookState = (
     showControls: true,
     setShowControls: jest.fn() as VideoPlayerHookState["setShowControls"],
     resetControlsTimeout: jest.fn() as VideoPlayerHookState["resetControlsTimeout"],
-    playerRef: { current: mockReactPlayer } as MutableRefObject<ReactPlayer | null>,
+    playerRef: createMockPlayerRef(),
   };
 
   return {

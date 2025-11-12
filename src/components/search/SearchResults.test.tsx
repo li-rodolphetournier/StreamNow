@@ -99,7 +99,69 @@ const createTmdbQueryResult = (
     errorUpdateCount: 0,
     ...overrides,
   }) as UseQueryResult<{ videos: Video[]; totalPages: number }, Error>;
+// Autour de la ligne 83
+const mockLoadingQuery = {
+  data: undefined,
+  error: null,
+  isLoading: true,
+  isError: false,
+  isPending: true,
+  isSuccess: false,
+  status: 'pending' as const,
+  fetchStatus: 'fetching' as const,
+  isLoadingError: false,
+  isRefetchError: false,
+  isFetching: true,
+  isFetched: false,
+  isRefetching: false,
+  isStale: false,
+  isPaused: false,
+  isPlaceholderData: false,
+  refetch: vi.fn(),
+  dataUpdatedAt: 0,
+  errorUpdatedAt: 0,
+  failureCount: 0,
+  failureReason: null,
+  errorUpdateCount: 0,
+} as any;
 
+// Autour de la ligne 95
+const mockErrorQuery = {
+  data: undefined,
+  error: new Error('Test error'),
+  isLoading: false,
+  isError: true,
+  isPending: false,
+  isSuccess: false,
+  status: 'error' as const,
+  fetchStatus: 'idle' as const,
+  isLoadingError: true,
+  isRefetchError: false,
+  isFetching: false,
+  isFetched: true,
+  isRefetching: false,
+  isStale: false,
+  isPaused: false,
+  isPlaceholderData: false,
+  refetch: vi.fn(),
+  dataUpdatedAt: 0,
+  errorUpdatedAt: Date.now(),
+  failureCount: 1,
+  failureReason: new Error('Test error'),
+  errorUpdateCount: 1,
+} as any;
+
+// Ligne 108 - Ajoutez totalPages
+const mockEmptyData = {
+  videos: [],
+  totalPages: 0, // ⬅️ AJOUTER
+};
+
+// Ligne 132 - Ajoutez totalPages
+const mockVideosData = {
+  videos: [/* vos vidéos mockées */],
+  totalPages: 5, // ⬅️ AJOUTER
+};
 describe("SearchResults", () => {
   beforeEach(() => {
     jest.clearAllMocks();
