@@ -7,6 +7,10 @@
     "apps/home-server",
     "apps/desktop"
   ],
+  "engines": {
+    "node": ">=20.11.1",
+    "npm": ">=10.2.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
