@@ -123,7 +123,7 @@ const mockLoadingQuery = {
   failureCount: 0,
   failureReason: null,
   errorUpdateCount: 0,
-} as any;
+} as unknown as UseQueryResult<{ videos: Video[]; totalPages: number }, Error>;
 
 // Autour de la ligne 95
 const mockErrorQuery = {
@@ -149,7 +149,7 @@ const mockErrorQuery = {
   failureCount: 1,
   failureReason: new Error('Test error'),
   errorUpdateCount: 1,
-} as any;
+} as unknown as UseQueryResult<{ videos: Video[]; totalPages: number }, Error>;
 
 // Ligne 108 - Ajoutez totalPages
 const mockEmptyData = {
