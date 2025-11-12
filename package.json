@@ -8,7 +8,7 @@
     "apps/desktop"
   ],
   "engines": {
-    "node": ">=20.11.1",
+    "node": ">=20.9.0",
     "npm": ">=10.2.0"
   },
   "scripts": {
