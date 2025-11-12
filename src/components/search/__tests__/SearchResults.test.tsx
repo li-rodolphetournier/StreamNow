@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import type { Video } from "@/types/video";
 
 const mockUseSearchVideos = jest.fn();
 const mockUseLibrarySearch = jest.fn();
@@ -28,6 +30,38 @@ const renderWithQueryClient = (ui: React.ReactElement) => {
   );
 };
 
+const createTmdbQueryResult = (
+  overrides: Partial<
+    UseQueryResult<{ videos: Video[]; totalPages: number }, Error>
+  >
+): UseQueryResult<{ videos: Video[]; totalPages: number }, Error> =>
+  ({
+    data: undefined,
+    error: null,
+    isLoading: false,
+    isError: false,
+    isPending: false,
+    isSuccess: true,
+    status: "success",
+    fetchStatus: "idle",
+    isLoadingError: false,
+    isRefetchError: false,
+    isFetching: false,
+    isFetched: true,
+    isRefetching: false,
+    isStale: false,
+    isPaused: false,
+    isPlaceholderData: false,
+    refetch: jest.fn(),
+    remove: jest.fn(),
+    dataUpdatedAt: 0,
+    errorUpdatedAt: 0,
+    failureCount: 0,
+    failureReason: null,
+    errorUpdateCount: 0,
+    ...overrides,
+  }) as UseQueryResult<{ videos: Video[]; totalPages: number }, Error>;
+
 describe("SearchResults", () => {
   beforeEach(() => {
     mockUseSearchVideos.mockReset();
@@ -40,14 +74,44 @@ describe("SearchResults", () => {
   });
 
   it("shows loading skeleton when fetching", () => {
-    mockUseSearchVideos.mockReturnValue({ isLoading: true });
+    const mockLoadingQuery = createTmdbQueryResult({
+      data: undefined,
+      isLoading: true,
+      isPending: true,
+      isSuccess: false,
+      status: "pending",
+      fetchStatus: "fetching",
+      isFetching: true,
+      isFetched: false,
+    });
+
+    mockUseSearchVideos.mockReturnValue(mockLoadingQuery);
 
     const { container } = renderWithQueryClient(<SearchResults query="demo" />);
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
   });
 
   it("renders error message on failure", () => {
-    mockUseSearchVideos.mockReturnValue({ isLoading: false, error: new Error("fail") });
+    const testError = new Error("fail");
+    const mockErrorQuery = createTmdbQueryResult({
+      data: undefined,
+      error: testError,
+      isLoading: false,
+      isError: true,
+      isPending: false,
+      isSuccess: false,
+      status: "error",
+      fetchStatus: "idle",
+      isLoadingError: true,
+      isFetching: false,
+      isFetched: true,
+      failureCount: 1,
+      failureReason: testError,
+      errorUpdatedAt: Date.now(),
+      errorUpdateCount: 1,
+    });
+
+    mockUseSearchVideos.mockReturnValue(mockErrorQuery);
 
     renderWithQueryClient(<SearchResults query="demo" />);
     expect(
@@ -56,11 +120,18 @@ describe("SearchResults", () => {
   });
 
   it("informs when no results", () => {
-    mockUseSearchVideos.mockReturnValue({
-      isLoading: false,
-      error: null,
-      data: { videos: [] },
-    });
+    const mockData = {
+      videos: [],
+      totalPages: 0,
+    };
+    mockUseSearchVideos.mockReturnValue(
+      createTmdbQueryResult({
+        data: mockData,
+        isLoading: false,
+        isSuccess: true,
+        isFetched: true,
+      })
+    );
 
     renderWithQueryClient(<SearchResults query="demo" />);
     expect(screen.getByText("Aucun résultat")).toBeInTheDocument();
@@ -70,16 +141,18 @@ describe("SearchResults", () => {
   });
 
   it("displays results and active filters", () => {
-    mockUseSearchVideos.mockReturnValue({
-      isLoading: false,
-      error: null,
-      data: {
-        videos: [
-          { id: 1, title: "Demo", voteAverage: 8, mediaType: "movie" },
-          { id: 2, title: "Demo 2", voteAverage: 7, mediaType: "tv" },
-        ],
-      },
-    });
+    const mockData = {
+      videos: [
+        { id: 1, title: "Demo", voteAverage: 8, mediaType: "movie" },
+        { id: 2, title: "Demo 2", voteAverage: 7, mediaType: "tv" },
+      ] as unknown as Video[],
+      totalPages: 5,
+    };
+    mockUseSearchVideos.mockReturnValue(
+      createTmdbQueryResult({
+        data: mockData,
+      })
+    );
 
     renderWithQueryClient(
       <SearchResults

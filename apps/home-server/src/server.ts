@@ -2,7 +2,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import multipart, { MultipartFile } from "@fastify/multipart";
 import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { createWriteStream } from "fs";
+import { createReadStream, createWriteStream } from "fs";
 import { promises as fs } from "fs";
 import path from "path";
 import { pipeline } from "stream/promises";
@@ -79,7 +79,10 @@ const USER_ID_HEADER = "x-user-id";
 const extractUserId = (request: FastifyRequest): string | null => {
   const raw = request.headers[USER_ID_HEADER];
   if (!raw) {
-    return null;
+    const query = request.query as Record<string, unknown> | undefined;
+    const queryValue =
+      typeof query?.userId === "string" ? query.userId.trim() : undefined;
+    return queryValue && queryValue.length > 0 ? queryValue : null;
   }
 
   if (Array.isArray(raw)) {
@@ -109,6 +112,40 @@ const emptyStats = (): AggregateStats => ({
   directories: 0,
   totalSize: 0,
 });
+
+const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
+  ".mp4": "video/mp4",
+  ".mkv": "video/x-matroska",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".avi": "video/x-msvideo",
+  ".m4v": "video/x-m4v",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".flac": "audio/flac",
+  ".ogg": "audio/ogg",
+  ".m3u8": "application/vnd.apple.mpegurl",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".bmp": "image/bmp",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
+  ".srt": "application/x-subrip; charset=utf-8",
+  ".vtt": "text/vtt; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".csv": "text/csv; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+};
+
+const detectMimeType = (filePath: string): string => {
+  const extension = path.extname(filePath).toLowerCase();
+  return MIME_TYPE_BY_EXTENSION[extension] ?? "application/octet-stream";
+};
 
 const USERS_DIRECTORY = "users";
 
@@ -560,6 +597,141 @@ export async function createServer(): Promise<FastifyInstance> {
       return {
         status: "error",
         message: "Impossible de récupérer la bibliothèque locale",
+      };
+    }
+  });
+
+  app.get("/api/v1/media/content", async (request, reply) => {
+    const userId = extractUserId(request);
+
+    if (!userId) {
+      reply.code(401);
+      return {
+        status: "error",
+        message: "Authentification requise.",
+      };
+    }
+
+    const mediaRoot = path.resolve(env.HOME_SERVER_MEDIA_ROOT);
+    const query = request.query as { path?: string };
+    const sanitizedPath = sanitizeRelativePath(query.path ?? undefined);
+
+    if (!sanitizedPath) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Chemin invalide.",
+      };
+    }
+
+    const manageableRoots = await collectManageableRoots(userId);
+    if (!isPathWithinManageableRoots(sanitizedPath, manageableRoots)) {
+      reply.code(403);
+      return {
+        status: "error",
+        message: "Accès réservé à votre espace personnel.",
+      };
+    }
+
+    const absolutePath = path.join(mediaRoot, sanitizedPath);
+
+    if (!absolutePath.startsWith(mediaRoot)) {
+      reply.code(400);
+      return {
+        status: "error",
+        message: "Chemin en dehors du dossier média.",
+      };
+    }
+
+    try {
+      const stats = await fs.stat(absolutePath);
+
+      if (!stats.isFile()) {
+        reply.code(404);
+        return {
+          status: "error",
+          message: "Fichier introuvable.",
+        };
+      }
+
+      const totalSize = stats.size;
+      const mimeType = detectMimeType(absolutePath);
+      const fileName = path.basename(absolutePath);
+      const safeFileName = fileName.replace(/"/g, '\\"');
+      const rangeHeader = request.headers.range;
+
+      reply.header("Accept-Ranges", "bytes");
+      reply.header("Content-Disposition", `inline; filename="${safeFileName}"`);
+      reply.header("Cache-Control", "private, max-age=60");
+
+      if (rangeHeader) {
+        const matches = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader);
+        if (!matches) {
+          reply.code(416);
+          reply.header("Content-Range", `bytes */${totalSize}`);
+          return {
+            status: "error",
+            message: "En-tête Range invalide.",
+          };
+        }
+
+        const start = Number(matches[1]);
+        const endCandidate = matches[2] ? Number(matches[2]) : totalSize - 1;
+
+        if (
+          Number.isNaN(start) ||
+          Number.isNaN(endCandidate) ||
+          start >= totalSize
+        ) {
+          reply.code(416);
+          reply.header("Content-Range", `bytes */${totalSize}`);
+          return {
+            status: "error",
+            message: "Plage de lecture incorrecte.",
+          };
+        }
+
+        const end = Math.min(endCandidate, totalSize - 1);
+
+        if (start > end) {
+          reply.code(416);
+          reply.header("Content-Range", `bytes */${totalSize}`);
+          return {
+            status: "error",
+            message: "Plage de lecture incorrecte.",
+          };
+        }
+
+        const chunkSize = end - start + 1;
+        reply.code(206);
+        reply.header("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+        reply.header("Content-Length", chunkSize);
+        reply.header("Content-Type", mimeType);
+
+        const stream = createReadStream(absolutePath, { start, end });
+        return reply.send(stream);
+      }
+
+      reply.header("Content-Length", totalSize);
+      reply.header("Content-Type", mimeType);
+      const stream = createReadStream(absolutePath);
+      return reply.send(stream);
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+
+      if (nodeError?.code === "ENOENT") {
+        reply.code(404);
+        return {
+          status: "error",
+          message: "Fichier introuvable.",
+        };
+      }
+
+      app.log.error({ err: error, sanitizedPath }, "Failed to stream media file");
+      reply.code(500);
+      return {
+        status: "error",
+        message: "Impossible de lire le fichier demandé.",
       };
     }
   });
