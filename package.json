@@ -51,6 +51,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "@playwright/test": "^1.49.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.2.0",
