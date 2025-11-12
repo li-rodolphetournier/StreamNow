@@ -259,3 +259,11 @@ export async function createHomeDirectory(
 
   return (await response.json()) as CreateHomeDirectoryResponse;
 }
+
+export function buildHomeMediaContentUrl(relativePath: string, userId: string): string {
+  const endpoint = assertHomeEndpoint();
+  const url = new URL(`${endpoint}/api/v1/media/content`);
+  url.searchParams.set("path", relativePath);
+  url.searchParams.set("userId", userId);
+  return url.toString();
+}

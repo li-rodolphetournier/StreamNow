@@ -19,6 +19,23 @@ const mockedUseVideoPlayer = jest.mocked(useVideoPlayer);
 const mockedGetMovieVideos = jest.mocked(getMovieVideos);
 const mockedGetTVShowVideos = jest.mocked(getTVShowVideos);
 
+interface MockPlayerRef {
+  current: {
+    seekTo: jest.Mock;
+    getCurrentTime: jest.Mock;
+    getSecondsLoaded: jest.Mock;
+    getDuration: jest.Mock;
+    getInternalPlayer: jest.Mock;
+    showPreview: jest.Mock;
+    wrapper: unknown;
+    props: unknown;
+    state: unknown;
+    handleClickPreview: jest.Mock;
+    handleMouseMove: jest.Mock;
+    isReady: boolean;
+  };
+}
+
 interface MockHookState {
   isPlaying: boolean;
   setIsPlaying: jest.Mock;
@@ -37,8 +54,25 @@ interface MockHookState {
   showControls: boolean;
   setShowControls: jest.Mock;
   resetControlsTimeout: jest.Mock;
-  playerRef: { current: { seekTo: jest.Mock } };
+  playerRef: MockPlayerRef;
 }
+
+const createMockPlayerRef = (): MockPlayerRef => ({
+  current: {
+    seekTo: jest.fn(),
+    getCurrentTime: jest.fn(() => 0),
+    getSecondsLoaded: jest.fn(() => 0),
+    getDuration: jest.fn(() => 0),
+    getInternalPlayer: jest.fn(() => null),
+    showPreview: jest.fn(),
+    wrapper: null,
+    props: {},
+    state: {},
+    handleClickPreview: jest.fn(),
+    handleMouseMove: jest.fn(),
+    isReady: false,
+  },
+});
 
 const createHookState = (overrides: Partial<MockHookState> = {}): MockHookState => ({
   isPlaying: false,
@@ -58,7 +92,7 @@ const createHookState = (overrides: Partial<MockHookState> = {}): MockHookState 
   showControls: true,
   setShowControls: jest.fn(),
   resetControlsTimeout: jest.fn(),
-  playerRef: { current: { seekTo: jest.fn() } },
+  playerRef: createMockPlayerRef(),
   ...overrides,
 });
 

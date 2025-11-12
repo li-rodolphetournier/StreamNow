@@ -1,6 +1,14 @@
 "use client";
 
-import { Fragment, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  FormEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Folder,
@@ -35,6 +43,7 @@ import {
   setHomeMediaType,
   createHomeMediaTypeDefinition,
   deleteHomeMediaTypeDefinition,
+  buildHomeMediaContentUrl,
   type CreateHomeMediaTypeDefinitionInput,
 } from "@/lib/api/home";
 import { confirmToast } from "@/components/shared/confirmToast";
@@ -232,6 +241,7 @@ function MediaNodeRow({
   resolveMediaType,
   resolveOwnerLabel,
   isPersonalRoot = false,
+  onPreview,
 }: {
   node: HomeMediaNode;
   depth?: number;
@@ -251,6 +261,7 @@ function MediaNodeRow({
   resolveMediaType: (media: HomeMediaNode) => ResolvedMediaType | null;
   resolveOwnerLabel: (media: HomeMediaNode) => string;
   isPersonalRoot?: boolean;
+  onPreview: (media: HomeMediaNode) => void;
 }) {
   const canDelete = canManage && Boolean(node.relativePath);
   const isDeleting = deletingPath === node.relativePath;
@@ -451,6 +462,7 @@ function MediaNodeRow({
             resolveMediaType={resolveMediaType}
             resolveOwnerLabel={resolveOwnerLabel}
             isPersonalRoot={isPersonalRoot}
+            onPreview={onPreview}
           />
         ))}
       </div>
@@ -532,7 +544,14 @@ function MediaNodeRow({
             }}
           />
         )}
-        <span className="truncate text-sm">{node.name}</span>
+        <button
+          type="button"
+          onClick={() => onPreview(node)}
+          className="truncate rounded-sm border-0 bg-transparent p-0 text-left text-sm font-medium text-primary underline-offset-2 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          title={`Ouvrir ${node.name}`}
+        >
+          {node.name}
+        </button>
       </div>
       <div className="ml-4 flex shrink-0 items-center gap-2">
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -622,6 +641,278 @@ function MediaNodeRow({
         </div>
       </div>
     </div>
+  );
+}
+
+type PreviewMode = "image" | "video" | "audio" | "pdf" | "text" | "unsupported";
+
+const IMAGE_PREVIEW_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".svg",
+]);
+
+const VIDEO_PREVIEW_EXTENSIONS = new Set([".mp4", ".webm", ".mkv", ".mov", ".avi", ".m4v"]);
+
+const AUDIO_PREVIEW_EXTENSIONS = new Set([".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac"]);
+
+const TEXT_PREVIEW_EXTENSIONS = new Set([
+  ".txt",
+  ".md",
+  ".srt",
+  ".vtt",
+  ".json",
+  ".csv",
+  ".log",
+  ".yaml",
+  ".yml",
+  ".xml",
+  ".ini",
+  ".env",
+]);
+
+const PDF_PREVIEW_EXTENSIONS = new Set([".pdf"]);
+
+const resolvePreviewMode = (media: HomeMediaNode): PreviewMode => {
+  if (media.mediaType === "image") {
+    return "image";
+  }
+  if (media.mediaType === "video") {
+    return "video";
+  }
+  if (media.mediaType === "audio") {
+    return "audio";
+  }
+  if (media.mediaType === "subtitle") {
+    return "text";
+  }
+
+  const extension = media.extension?.toLowerCase() ?? "";
+  if (PDF_PREVIEW_EXTENSIONS.has(extension)) {
+    return "pdf";
+  }
+  if (IMAGE_PREVIEW_EXTENSIONS.has(extension)) {
+    return "image";
+  }
+  if (VIDEO_PREVIEW_EXTENSIONS.has(extension)) {
+    return "video";
+  }
+  if (AUDIO_PREVIEW_EXTENSIONS.has(extension)) {
+    return "audio";
+  }
+  if (TEXT_PREVIEW_EXTENSIONS.has(extension)) {
+    return "text";
+  }
+
+  return "unsupported";
+};
+
+const MAX_TEXT_PREVIEW_BYTES = 1_000_000; // ~1 Mo
+
+interface HomeMediaPreviewDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  media: HomeMediaNode | null;
+  contentUrl: string | null;
+}
+
+function HomeMediaPreviewDialog({
+  open,
+  onOpenChange,
+  media,
+  contentUrl,
+}: HomeMediaPreviewDialogProps) {
+  const mode = useMemo<PreviewMode | null>(() => (media ? resolvePreviewMode(media) : null), [media]);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [isTextLoading, setIsTextLoading] = useState(false);
+  const [textError, setTextError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !media || mode !== "text" || !contentUrl) {
+      setTextContent(null);
+      setTextError(null);
+      setIsTextLoading(false);
+      return;
+    }
+
+    if (typeof media.size === "number" && media.size > MAX_TEXT_PREVIEW_BYTES) {
+      setTextContent(null);
+      setTextError("Fichier trop volumineux pour un aperçu rapide.");
+      setIsTextLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setIsTextLoading(true);
+    setTextError(null);
+
+    fetch(contentUrl, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Statut ${response.status}`);
+        }
+        return response.text();
+      })
+      .then((payload) => {
+        setTextContent(payload);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setTextError("Impossible de charger le contenu du fichier.");
+        setTextContent(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsTextLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [open, media, mode, contentUrl]);
+
+  const description = useMemo(() => {
+    if (!media) {
+      return "Sélectionnez un fichier pour afficher un aperçu.";
+    }
+
+    const parts: string[] = [];
+    if (media.extension) {
+      parts.push(media.extension);
+    }
+    if (typeof media.size === "number") {
+      parts.push(formatBytes(media.size));
+    }
+    if (media.modifiedAt) {
+      parts.push(`Modifié le ${new Date(media.modifiedAt).toLocaleString()}`);
+    }
+
+    return parts.join(" • ") || "Aucun détail disponible";
+  }, [media]);
+
+  let body: ReactNode;
+
+  if (!media || !contentUrl) {
+    body = (
+      <p className="text-sm text-muted-foreground">
+        Sélectionnez un fichier dans la bibliothèque pour afficher un aperçu.
+      </p>
+    );
+  } else if (mode === "image") {
+    body = (
+      <div className="flex max-h-[65vh] w-full items-center justify-center overflow-hidden rounded-md border bg-background">
+        <img
+          src={contentUrl}
+          alt={media.name}
+          className="max-h-[65vh] w-full object-contain"
+          loading="lazy"
+        />
+      </div>
+    );
+  } else if (mode === "video") {
+    body = (
+      <video
+        key={contentUrl}
+        controls
+        className="h-[65vh] w-full rounded-md bg-black"
+        preload="metadata"
+      >
+        <source src={contentUrl} />
+        Votre navigateur ne supporte pas la lecture vidéo.
+      </video>
+    );
+  } else if (mode === "audio") {
+    body = (
+      <audio key={contentUrl} controls className="w-full rounded-md border bg-background/60 p-3">
+        <source src={contentUrl} />
+        Votre navigateur ne supporte pas la lecture audio.
+      </audio>
+    );
+  } else if (mode === "pdf") {
+    body = (
+      <iframe
+        key={contentUrl}
+        src={contentUrl}
+        title={`Aperçu ${media.name}`}
+        className="h-[65vh] w-full rounded-md border bg-background"
+      />
+    );
+  } else if (mode === "text") {
+    if (isTextLoading) {
+      body = (
+        <div className="flex h-[48vh] items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        </div>
+      );
+    } else if (textError) {
+      body = (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {textError}
+        </div>
+      );
+    } else if (textContent !== null) {
+      body = (
+        <pre className="max-h-[48vh] overflow-auto rounded-md border bg-muted/20 p-4 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+          {textContent}
+        </pre>
+      );
+    } else {
+      body = (
+        <p className="text-sm text-muted-foreground">
+          Aucun contenu à afficher pour ce fichier texte.
+        </p>
+      );
+    }
+  } else {
+    body = (
+      <div className="space-y-2 text-sm text-muted-foreground">
+        <p>Aucun aperçu n'est disponible pour ce type de fichier.</p>
+        <p>
+          Vous pouvez cependant{" "}
+          <a
+            href={contentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            l'ouvrir dans un nouvel onglet
+          </a>{" "}
+          pour le consulter.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-4xl space-y-4 md:w-[80vw] lg:w-[70vw]">
+        <DialogHeader>
+          <DialogTitle>{media?.name ?? "Aucun fichier sélectionné"}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <div className="min-h-[220px]">{body}</div>
+        {contentUrl ? (
+          <DialogFooter className="flex flex-col items-stretch gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-xs text-muted-foreground">
+              L'aperçu est généré depuis votre StreamNow Home Server.
+            </span>
+            <Button asChild variant="outline" size="sm">
+              <a href={contentUrl} target="_blank" rel="noopener noreferrer">
+                Ouvrir dans un nouvel onglet
+              </a>
+            </Button>
+          </DialogFooter>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -733,6 +1024,8 @@ export function HomeMediaExplorer({
   const [iconSearchResults, setIconSearchResults] = useState<string[]>([]);
   const [isIconSearchLoading, setIsIconSearchLoading] = useState(false);
   const [iconSearchError, setIconSearchError] = useState<string | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<HomeMediaNode | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const friendsOverviewQuery = useFriendsOverview(true);
   const friendUsers = friendsOverviewQuery.data?.friends ?? [];
@@ -803,6 +1096,22 @@ export function HomeMediaExplorer({
     },
     [currentUserLabel, ownerDisplayName, ownerId, ownerLabelMap, resolveOwnerIdForNode, userId]
   );
+
+  const handlePreview = useCallback((media: HomeMediaNode) => {
+    if (media.kind !== "file") {
+      return;
+    }
+    setPreviewTarget(media);
+    setIsPreviewOpen(true);
+  }, []);
+
+  const previewContentUrl = useMemo(() => {
+    if (!previewTarget?.relativePath) {
+      return null;
+    }
+
+    return buildHomeMediaContentUrl(previewTarget.relativePath, userId);
+  }, [previewTarget, userId]);
 
   useEffect(() => {
     if (!isCreateTypeDialogOpen) {
@@ -1714,6 +2023,7 @@ export function HomeMediaExplorer({
                 resolveMediaType={resolveMediaType}
                 resolveOwnerLabel={resolveOwnerLabel}
                 isPersonalRoot
+                onPreview={handlePreview}
               />
               {isOwner && shareTarget && shareTargetPath === personalNode.relativePath ? (
                 <LocalMediaSharePanel
@@ -1752,6 +2062,7 @@ export function HomeMediaExplorer({
                   onEditType={openTypeDialog}
                   resolveMediaType={resolveMediaType}
                   resolveOwnerLabel={resolveOwnerLabel}
+                onPreview={handlePreview}
                 />
                 {isOwner && shareTarget && shareTargetPath === child.relativePath ? (
                   <LocalMediaSharePanel
@@ -2218,6 +2529,17 @@ export function HomeMediaExplorer({
           ) : null}
         </DialogContent>
       </Dialog>
+      <HomeMediaPreviewDialog
+        open={isPreviewOpen && Boolean(previewTarget)}
+        onOpenChange={(open) => {
+          setIsPreviewOpen(open);
+          if (!open) {
+            setPreviewTarget(null);
+          }
+        }}
+        media={previewTarget}
+        contentUrl={previewContentUrl}
+      />
     </>
   );
 }
