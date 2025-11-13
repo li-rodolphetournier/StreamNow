@@ -1,7 +1,5 @@
-import algoliasearch, {
-  type SearchClient,
-  type SearchIndex,
-} from "algoliasearch";
+import { algoliasearch } from "algoliasearch";
+import type { SearchClient } from "algoliasearch";
 import { env } from "../config/env";
 import { logger } from "../lib/logger";
 import type { Video } from "../entities/Video";
@@ -27,7 +25,7 @@ interface AlgoliaVideoRecord {
 class AlgoliaService {
   private readonly enabled: boolean;
   private readonly client?: SearchClient;
-  private readonly index?: SearchIndex;
+  private readonly indexName?: string;
 
   constructor() {
     if (
@@ -37,7 +35,7 @@ class AlgoliaService {
     ) {
       try {
         this.client = algoliasearch(env.algoliaAppId, env.algoliaAdminApiKey);
-        this.index = this.client.initIndex(env.algoliaIndexName);
+        this.indexName = env.algoliaIndexName;
         this.enabled = true;
         logger.info(
           { indexName: env.algoliaIndexName },
@@ -98,7 +96,7 @@ class AlgoliaService {
   }
 
   async syncVideo(video: Video): Promise<void> {
-    if (!this.enabled || !this.index) {
+    if (!this.enabled || !this.client || !this.indexName) {
       return;
     }
 
@@ -109,7 +107,10 @@ class AlgoliaService {
     }
 
     try {
-      await this.index.saveObject(record);
+      await this.client.saveObject({
+        indexName: this.indexName,
+        body: record,
+      });
     } catch (error) {
       logger.error(
         { err: error, videoId: video.id },
@@ -119,12 +120,15 @@ class AlgoliaService {
   }
 
   async deleteVideo(videoId: string): Promise<void> {
-    if (!this.enabled || !this.index) {
+    if (!this.enabled || !this.client || !this.indexName) {
       return;
     }
 
     try {
-      await this.index.deleteObject(videoId);
+      await this.client.deleteObject({
+        indexName: this.indexName,
+        objectID: videoId,
+      });
     } catch (error) {
       logger.error(
         { err: error, videoId },
@@ -134,15 +138,19 @@ class AlgoliaService {
   }
 
   async search(query: string): Promise<AlgoliaVideoRecord[]> {
-    if (!this.enabled || !this.index) {
+    if (!this.enabled || !this.client || !this.indexName) {
       return [];
     }
 
     try {
-      const result = await this.index.search<AlgoliaVideoRecord>(query, {
-        hitsPerPage: 20,
+      const result = await this.client.searchSingleIndex({
+        indexName: this.indexName,
+        searchParams: {
+          query,
+          hitsPerPage: 20,
+        },
       });
-      return result.hits ?? [];
+      return (result.hits as AlgoliaVideoRecord[]) ?? [];
     } catch (error) {
       logger.error({ err: error }, "Algolia search error");
       return [];
