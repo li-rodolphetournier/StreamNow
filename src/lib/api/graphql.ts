@@ -1,4 +1,5 @@
 import { clearAccessToken, getAccessToken, setAccessToken } from "@/lib/auth/tokens";
+import { mockGraphQLResponse } from "./mock";
 
 interface GraphQLRequest<TVariables = Record<string, unknown>> {
   query: string;
@@ -100,6 +101,20 @@ async function executeRequest<TData, TVariables>(
   options: Required<GraphQLRequestOptions>,
   retryOnAuthError: boolean
 ): Promise<TData> {
+  // Vérifier si on doit utiliser le mock frontend
+  const useFrontendMock = process.env.NEXT_PUBLIC_USE_FRONTEND_MOCK === "true";
+  
+  if (useFrontendMock) {
+    // Utiliser le mock frontend
+    const mockData = mockGraphQLResponse<TData>(request.query, request.variables);
+    if (mockData !== null) {
+      // Simuler un délai réseau
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return mockData;
+    }
+    // Si le mock ne gère pas cette query, continuer avec l'appel réel
+  }
+
   if (!endpoint) {
     throw new Error("NEXT_PUBLIC_API_URL is not defined");
   }
