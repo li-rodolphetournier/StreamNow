@@ -19,6 +19,7 @@ interface GraphQLResponse<TData> {
 
 interface GraphQLRequestOptions {
   auth?: boolean;
+  useMockAuth?: boolean;
 }
 
 const endpoint = process.env.NEXT_PUBLIC_API_URL;
@@ -107,14 +108,24 @@ async function executeRequest<TData, TVariables>(
     "Content-Type": "application/json",
   };
 
-  if (options.auth) {
+  // Add mock auth header if enabled
+  if (options.useMockAuth) {
+    headers["x-mock-auth"] = "true";
+  }
+
+  if (options.auth && !options.useMockAuth) {
     const token = getAccessToken();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
   }
 
-  const response = await fetch(endpoint, {
+  // Build URL with mock parameter if enabled
+  const url = options.useMockAuth
+    ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}mock=true`
+    : endpoint;
+
+  const response = await fetch(url, {
     method: "POST",
     headers,
     credentials: "include",
@@ -156,6 +167,7 @@ export async function graphqlRequest<TData, TVariables = Record<string, unknown>
 ): Promise<TData> {
   const mergedOptions: Required<GraphQLRequestOptions> = {
     auth: options.auth ?? true,
+    useMockAuth: options.useMockAuth ?? process.env.NEXT_PUBLIC_USE_MOCK_AUTH === "true",
   };
 
   return executeRequest(request, mergedOptions, true);

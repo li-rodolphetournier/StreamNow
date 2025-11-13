@@ -35,5 +35,6 @@ export const env = {
   algoliaAdminApiKey: process.env.ALGOLIA_ADMIN_API_KEY,
   algoliaSearchApiKey: process.env.ALGOLIA_SEARCH_API_KEY,
   algoliaIndexName: process.env.ALGOLIA_INDEX_NAME ?? "streamnow_videos",
+  enableMockAuth: process.env.ENABLE_MOCK_AUTH === "true",
 };
 

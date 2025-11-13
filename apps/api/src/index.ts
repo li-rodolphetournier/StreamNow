@@ -21,7 +21,23 @@ import { UserRole } from "./entities/User";
 import { verifyAccessToken } from "./lib/token";
 import cookieParser from "cookie-parser";
 
+const MOCK_USER_ID = "00000000-0000-0000-0000-000000000000";
+
 const extractUser = (req: Request) => {
+  // Check for mock authentication mode
+  if (env.enableMockAuth) {
+    const mockParam = req.query.mock === "true" || req.query.mock === "1";
+    const mockHeader = req.header("x-mock-auth") === "true" || req.header("x-mock-auth") === "1";
+    
+    if (mockParam || mockHeader) {
+      logger.info({ url: req.originalUrl }, "Mock authentication enabled");
+      return {
+        userId: MOCK_USER_ID,
+        userRole: UserRole.ADMIN,
+      } as const;
+    }
+  }
+
   const serviceToken = req.header("x-service-token");
   const hasServiceAccess =
     typeof serviceToken === "string" && serviceToken === env.serviceToken;
@@ -110,6 +126,22 @@ const bootstrap = async () => {
     "/graphql",
     expressMiddleware(server, {
       context: async ({ req, res }: ExpressContextFunctionArgument) => {
+        // Check for mock auth first (before token verification)
+        const headerUser = extractUser(req);
+        
+        // If mock auth is active and detected, use it directly
+        if (env.enableMockAuth && headerUser.userId === MOCK_USER_ID) {
+          const ability = buildAbilityFor({ userId: headerUser.userId, userRole: headerUser.userRole });
+          return {
+            req,
+            res,
+            userId: headerUser.userId,
+            userRole: headerUser.userRole,
+            ability,
+          } satisfies GraphQLContext;
+        }
+
+        // Otherwise, proceed with normal token-based authentication
         const authHeader = req.headers["authorization"];
         let tokenUserId: string | undefined;
         let tokenRole: UserRole | undefined;
@@ -123,7 +155,6 @@ const bootstrap = async () => {
           }
         }
 
-        const headerUser = extractUser(req);
         const userId = tokenUserId ?? headerUser.userId;
         const userRole = tokenRole ?? headerUser.userRole;
 
